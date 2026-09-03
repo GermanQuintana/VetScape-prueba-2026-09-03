@@ -2,6 +2,8 @@
 
 Cuatro prototipos independientes de escape room veterinario creados con diferentes modelos de IA: Gemini 3.8 Flash, Claude Fable 5.1, ChatGPT Sol 5.6 (alto) y GLM 5.3 Flash.
 
+## ▶️ [Abrir VetScape y probar los cuatro ejemplos](https://germanquintana.github.io/VetScape-prueba-2026-09-03/)
+
 La web permite probar cada experiencia en el navegador y descargar su archivo HTML. Las observaciones de rendimiento corresponden exclusivamente a esta prueba realizada el 3 de septiembre de 2026; no son un benchmark oficial.
 
 ## Three.js
