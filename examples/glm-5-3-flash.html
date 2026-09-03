@@ -1,0 +1,1355 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Turno de Guardia — Escape room de medicina interna veterinaria</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,650;1,9..144,500;1,9..144,650&family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#12150f; --paper:#f3eddd; --paper2:#eae1ca; --ink:#20281f; --ink2:#5a6350;
+  --line:#c9c0a4; --accent:#c26a1f; --green:#3e6b4a; --red:#a5432f;
+  --rxhi:#59c2d0; --hud:#efe9d6;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden;background:var(--bg)}
+body{font-family:'Space Grotesk',sans-serif;color:var(--ink)}
+button{font-family:inherit;cursor:pointer}
+.btn:disabled{opacity:.55;cursor:wait}
+#scene{position:fixed;inset:0;display:block;opacity:0;transition:opacity 1.2s ease;touch-action:none;cursor:crosshair}
+#scene.on{opacity:1}
+
+/* ---------- HUD ---------- */
+#hud{position:fixed;inset:0;pointer-events:none;z-index:20;color:var(--hud)}
+#hud.hidden{display:none}
+.hud-left{position:absolute;top:18px;left:22px}
+.hud-title{font-weight:700;letter-spacing:.22em;font-size:14px}
+.hud-sub{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.14em;opacity:.65;margin-top:3px}
+.hud-center{position:absolute;top:14px;left:50%;transform:translateX(-50%);text-align:center}
+.hud-time{font-family:'IBM Plex Mono',monospace;font-size:20px;font-weight:600;letter-spacing:.1em}
+.dots{display:flex;gap:7px;justify-content:center;margin-top:6px}
+.dot{width:26px;height:26px;border:1px solid rgba(239,233,214,.35);border-radius:50%;display:grid;place-items:center;font-family:'Fraunces',serif;font-size:14px;font-weight:650;opacity:.55}
+.dot.on{background:var(--hud);color:#1c2417;border-color:var(--hud);opacity:1}
+.hud-right{position:absolute;top:14px;right:18px;display:flex;gap:8px}
+.hbtn{pointer-events:auto;display:flex;align-items:center;gap:6px;background:rgba(16,20,14,.72);border:1px solid rgba(239,233,214,.18);color:var(--hud);padding:8px 11px;border-radius:8px;backdrop-filter:blur(8px);font-size:13px;font-weight:500}
+.hbtn:hover{border-color:rgba(239,233,214,.5)}
+.hbtn svg{width:16px;height:16px}
+#cross{position:fixed;left:50%;top:50%;width:5px;height:5px;margin:-2.5px;border-radius:50%;background:var(--hud);opacity:.85;z-index:19;mix-blend-mode:difference;pointer-events:none}
+#cross.active{width:22px;height:22px;margin:-11px;background:transparent;border:1.5px solid var(--hud)}
+#lookLabel{position:fixed;left:50%;top:calc(50% + 44px);transform:translateX(-50%);text-align:center;z-index:19;pointer-events:none;opacity:0;transition:opacity .15s}
+#lookLabel.on{opacity:1}
+#lookName{display:block;font-weight:700;font-size:15px;color:var(--hud);text-shadow:0 1px 6px rgba(0,0,0,.8)}
+#lookSub{display:block;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.15em;color:var(--accent);text-shadow:0 1px 6px rgba(0,0,0,.8);margin-top:2px}
+
+/* ---------- Overlays / paneles ---------- */
+.overlay{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;align-items:center;justify-content:center;overflow:auto;transition:opacity .5s}
+.overlay.dim{background:rgba(10,12,8,.66);backdrop-filter:blur(6px)}
+.overlay.gone{opacity:0;pointer-events:none}
+.frame{max-width:680px;width:min(92vw,680px);border:1px solid #3a4032;padding:52px 54px;color:#d8d4c2;position:relative}
+.frame::before{content:"";position:absolute;inset:6px;border:1px solid #2a2f24;pointer-events:none}
+.kicker{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.28em;color:var(--accent);margin-bottom:22px}
+h1{font-family:'Fraunces',serif;font-weight:650;font-size:clamp(42px,7vw,76px);line-height:.98;color:#f0ead6;letter-spacing:-.01em}
+h1 em{font-style:italic;color:var(--accent)}
+.lead{margin:26px 0 30px;font-size:16px;line-height:1.65;color:#b9b5a2;max-width:52ch}
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:10px 26px;margin-bottom:34px;font-size:13px;color:#a8a491}
+.controls div{display:flex;align-items:center;gap:10px}
+kbd{font-family:'IBM Plex Mono',monospace;font-size:11px;border:1px solid #4a5040;border-bottom-width:2px;border-radius:5px;padding:2px 7px;color:#e4dfc9;background:#1b2016;min-width:30px;text-align:center}
+.btn{background:var(--accent);color:#171410;border:none;font-weight:700;font-size:15px;letter-spacing:.06em;padding:15px 30px;border-radius:3px}
+.btn:hover:not(:disabled){background:#d97e30}
+.fine{margin-top:18px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#7d7a68;letter-spacing:.05em;line-height:1.6}
+#loadMsg b{color:#c26a1f}
+
+/* hoja de expediente */
+#panelCase{z-index:60}
+.sheet{width:min(94vw,740px);max-height:88vh;overflow:auto;background:var(--paper);color:var(--ink);box-shadow:10px 12px 0 rgba(0,0,0,.35);border:1px solid #b7ad8d;transform:translateY(24px);opacity:0;transition:all .35s cubic-bezier(.2,.8,.25,1)}
+#panelCase:not(.gone) .sheet{transform:none;opacity:1}
+.sheet-head{padding:22px 30px 16px;border-bottom:2px solid var(--ink);display:flex;justify-content:space-between;align-items:flex-start;gap:14px;position:sticky;top:0;background:var(--paper);z-index:2}
+.sheet-kicker{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.24em;color:var(--accent);margin-bottom:8px}
+.sheet h2{font-family:'Fraunces',serif;font-weight:650;font-size:34px;line-height:1}
+.sheet-pet{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--ink2);margin-top:7px;letter-spacing:.04em}
+.head-tools{display:flex;gap:8px;flex:0 0 auto}
+.tbtn{display:flex;align-items:center;gap:6px;background:transparent;border:1px solid var(--ink);border-radius:4px;padding:7px 10px;font-size:12px;font-weight:700;color:var(--ink)}
+.tbtn:hover{background:var(--ink);color:var(--paper)}
+.tbtn svg{width:14px;height:14px}
+.sheet-body{padding:24px 30px 34px}
+.sec-label{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.24em;color:var(--accent);border-bottom:1px dashed var(--line);padding-bottom:5px;margin:20px 0 10px}
+.sec-label:first-child{margin-top:0}
+.anamnesis{font-size:14.5px;line-height:1.6}
+table.lab{width:100%;border-collapse:collapse;font-family:'IBM Plex Mono',monospace;font-size:12.5px}
+table.lab td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+table.lab td:first-child{color:var(--ink2)}
+table.lab td.v{font-weight:600}
+table.lab td.r{color:var(--ink2);font-size:11px;text-align:right;white-space:nowrap}
+tr.flag-hi td.v{color:var(--red)} tr.flag-hi td.v::after{content:" ↑"}
+tr.flag-lo td.v{color:var(--red)} tr.flag-lo td.v::after{content:" ↓"}
+
+/* pasos */
+.qtag{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.22em;color:var(--accent);display:block;margin-bottom:8px}
+.qtext{font-size:16px;line-height:1.5;font-weight:500;margin-bottom:14px}
+.opts{display:flex;flex-direction:column;gap:8px}
+.opt{display:flex;gap:12px;align-items:baseline;text-align:left;background:var(--paper2);border:1px solid var(--line);padding:11px 14px;font-size:14px;line-height:1.4;border-radius:2px;color:var(--ink)}
+.opt b{font-family:'Fraunces',serif;color:var(--accent);flex:0 0 auto}
+.opt:hover{border-color:var(--ink)}
+.opt.ok{background:#dfe9d5;border-color:var(--green);color:var(--green)}
+.opt.bad{background:#eedbd2;border-color:var(--red);color:var(--red);opacity:.75;pointer-events:none}
+.why{margin-top:14px;background:var(--ink);color:#e8e3cf;padding:14px 16px;font-size:13.5px;line-height:1.6;border-radius:2px}
+.why .whytag{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.2em;color:var(--rxhi);display:block;margin-bottom:6px}
+.nextrow{margin-top:16px;display:flex;justify-content:flex-end}
+.btn-sm{background:var(--ink);color:var(--paper);border:none;padding:11px 20px;font-weight:700;font-size:13px;letter-spacing:.05em;border-radius:2px}
+.btn-sm:hover{background:#37402f}
+.inprow{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.inprow input{font-family:'IBM Plex Mono',monospace;font-size:20px;width:140px;padding:10px 12px;border:1px solid var(--ink);background:#fbf8ef;border-radius:2px;color:var(--ink)}
+.inprow .unit{font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--ink2)}
+.fbad{animation:shake .4s;color:var(--red);font-size:13px;margin-top:10px;font-family:'IBM Plex Mono',monospace}
+.fok{color:var(--green);font-size:13px;margin-top:10px;font-weight:700}
+@keyframes shake{0%,100%{transform:none}20%,60%{transform:translateX(-7px)}40%,80%{transform:translateX(7px)}}
+.hintpaper{margin-top:14px;background:#fdf6df;border:1px dashed var(--accent);padding:12px 14px;font-size:13px;line-height:1.55;color:#6b4a1a;position:relative}
+.hintpaper::before{content:"PISTA";font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.25em;color:var(--accent);display:block;margin-bottom:5px}
+
+/* microscopio */
+.micro-wrap{display:flex;flex-direction:column;align-items:center;gap:12px}
+.micro-canvas{border-radius:50%;border:10px solid #23261f;box-shadow:0 0 0 2px #3a3f33, inset 0 0 40px rgba(0,0,0,.7);cursor:crosshair;touch-action:none;max-width:100%}
+.micro-status{font-family:'IBM Plex Mono',monospace;font-size:12px;letter-spacing:.08em;color:var(--ink2)}
+.micro-status b{color:var(--green)}
+
+/* expediente resuelto */
+.solved{text-align:center;padding:16px 0 4px}
+.stamp{display:inline-block;font-family:'Fraunces',serif;font-weight:650;font-size:26px;letter-spacing:.12em;color:var(--green);border:3px solid var(--green);padding:6px 22px;transform:rotate(-7deg);border-radius:4px;opacity:.9}
+.digitbox{margin:22px 0 6px}
+.digitlbl{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.26em;color:var(--ink2)}
+.digit{font-family:'Fraunces',serif;font-weight:650;font-size:96px;line-height:1;color:var(--accent);animation:pop .5s cubic-bezier(.2,1.6,.4,1)}
+@keyframes pop{from{transform:scale(.3);opacity:0}to{transform:scale(1);opacity:1}}
+.pearl{margin:18px auto 24px;max-width:46ch;text-align:left;font-size:14px;line-height:1.6;background:var(--paper2);border-left:3px solid var(--accent);padding:12px 16px}
+.pearl b{color:var(--accent)}
+
+/* keypad */
+.keypad{width:min(92vw,340px);background:#1b1e18;border:1px solid #3d4234;border-radius:10px;padding:22px;box-shadow:0 24px 60px rgba(0,0,0,.6);position:relative}
+.kp-title{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.3em;color:var(--accent);text-align:center;margin-bottom:14px}
+.kp-display{font-family:'IBM Plex Mono',monospace;font-size:30px;font-weight:600;letter-spacing:.24em;text-align:center;color:var(--rxhi);background:#0b1512;border:1px solid #2c3b38;border-radius:6px;padding:14px 0 12px;text-indent:.24em;min-height:64px}
+.kp-display.bad{animation:shake .4s;color:#e06a4e}
+.kp-hint{font-family:'IBM Plex Mono',monospace;font-size:10px;color:#8a8a74;text-align:center;margin:10px 0 14px;letter-spacing:.1em}
+.kp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.kp-grid button{background:#262b21;border:1px solid #3d4234;color:#e6e1cb;font-family:'IBM Plex Mono',monospace;font-size:19px;padding:13px 0;border-radius:6px}
+.kp-grid button:hover{background:#333a2b}
+.close-x{position:absolute;top:10px;right:10px;background:transparent;border:none;color:#8a8a74;padding:6px}
+.close-x svg{width:18px;height:18px}
+
+/* cuaderno */
+.notes{width:min(94vw,560px);max-height:86vh;overflow:auto;background:var(--paper);color:var(--ink);border:1px solid #b7ad8d;box-shadow:10px 12px 0 rgba(0,0,0,.35);padding:28px 30px;position:relative}
+.notes h3{font-family:'Fraunces',serif;font-size:26px;font-weight:650;margin-bottom:4px}
+.notes .sub{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.22em;color:var(--accent);margin-bottom:18px}
+.noterow{display:flex;align-items:baseline;gap:12px;padding:10px 2px;border-bottom:1px dashed var(--line);font-size:14px}
+.noterow .num{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--ink2)}
+.noterow .st{margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.1em}
+.noterow .st.pend{color:var(--ink2)} .noterow .st.done{color:var(--green);font-weight:600}
+.noterow .dg{font-family:'Fraunces',serif;font-weight:650;font-size:18px;color:var(--accent)}
+.codeline{margin-top:20px;font-family:'IBM Plex Mono',monospace;font-size:22px;letter-spacing:.5em;text-align:center;color:var(--ink);background:var(--paper2);border:1px solid var(--line);padding:12px}
+.notepearl{font-size:12.5px;line-height:1.5;color:var(--ink2);margin:8px 0 0;border-left:2px solid var(--accent);padding-left:10px}
+
+/* toasts */
+#toasts{position:fixed;top:74px;left:50%;transform:translateX(-50%);z-index:80;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;width:min(92vw,520px)}
+.toast{display:flex;gap:10px;align-items:flex-start;background:rgba(18,22,14,.92);border:1px solid rgba(239,233,214,.22);border-left:3px solid var(--accent);color:#e8e3cf;padding:12px 16px;font-size:13.5px;line-height:1.45;backdrop-filter:blur(8px);animation:tin .35s cubic-bezier(.2,1.2,.4,1);max-width:100%}
+.toast.err{border-left-color:var(--red)}
+.toast svg{width:16px;height:16px;flex:0 0 auto;margin-top:2px;color:var(--accent)}
+.toast.err svg{color:#e06a4e}
+.toast.out{opacity:0;transform:translateY(-8px);transition:all .4s}
+@keyframes tin{from{opacity:0;transform:translateY(-10px)}to{opacity:1}}
+
+/* final */
+.endstats{display:flex;gap:34px;margin:26px 0}
+.endstats div b{display:block;font-family:'Fraunces',serif;font-size:34px;font-weight:650;color:#f0ead6}
+.endstats div span{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.18em;color:#8b8873}
+.learn li{margin:12px 0;font-size:14px;line-height:1.6;color:#c4c0ac;padding-left:6px;list-style:none}
+.learn li b{color:var(--accent);font-family:'Fraunces',serif}
+.endtitle{font-family:'Fraunces',serif;font-weight:650;font-size:clamp(38px,6vw,60px);color:#f0ead6;line-height:1.02}
+.endtitle em{color:var(--green);font-style:italic}
+
+#fade{position:fixed;inset:0;background:#f6f1e2;opacity:0;pointer-events:none;transition:opacity 1.4s;z-index:90}
+#fade.on{opacity:1}
+
+/* móvil */
+#stick{position:fixed;left:26px;bottom:30px;width:112px;height:112px;border:1.5px solid rgba(239,233,214,.3);border-radius:50%;z-index:25;display:none;touch-action:none}
+#stickKnob{position:absolute;left:50%;top:50%;width:44px;height:44px;margin:-22px;border-radius:50%;background:rgba(239,233,214,.25);border:1px solid rgba(239,233,214,.4)}
+#btnAct{position:fixed;right:26px;bottom:34px;width:64px;height:64px;border-radius:50%;background:rgba(16,20,14,.8);border:1.5px solid var(--accent);color:var(--accent);z-index:25;display:none;align-items:center;justify-content:center}
+#btnAct svg{width:26px;height:26px}
+body.touch #stick{display:block} body.touch #btnAct.show{display:flex}
+@media (max-width:640px){
+  .hud-left{display:none} .frame{padding:34px 26px} .controls{grid-template-columns:1fr}
+  .sheet-body{padding:18px 18px 26px} .sheet-head{padding:16px 18px 12px} .sheet h2{font-size:26px}
+}
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+<div id="cross"></div>
+<div id="lookLabel"><span id="lookName"></span><span id="lookSub"></span></div>
+
+<div id="hud" class="hidden">
+  <div class="hud-left">
+    <div class="hud-title">CONSULTA 3</div>
+    <div class="hud-sub">MEDICINA INTERNA · TURNO DE GUARDIA</div>
+  </div>
+  <div class="hud-center">
+    <span class="hud-time" id="hudTime">00:00</span>
+    <div class="dots" id="dots"></div>
+  </div>
+  <div class="hud-right">
+    <button class="hbtn" id="btnHintTop"><i data-lucide="lightbulb"></i><span id="hudHints">6</span></button>
+    <button class="hbtn" id="btnNotes"><i data-lucide="clipboard-list"></i></button>
+    <button class="hbtn" id="btnMute"><i data-lucide="volume-2"></i></button>
+  </div>
+</div>
+
+<!-- INTRO -->
+<div class="overlay" id="screenIntro">
+  <div class="frame">
+    <div class="kicker">EXPEDIENTE Nº 047 · CONSULTA 3 · MEDICINA INTERNA</div>
+    <h1>Turno de <em>guardia</em></h1>
+    <p class="lead">El protocolo de cierre se ha activado con la consulta aún ocupada. Cinco pacientes esperan diagnóstico y la puerta solo se abre con el código que esconde cada expediente clínico. Resuelve los cinco casos, recupera los cinco dígitos y sal de aquí.</p>
+    <div class="controls">
+      <div><kbd>W A S D</kbd> Moverse</div>
+      <div><kbd>Ratón</kbd> Mirar (o arrastrar)</div>
+      <div><kbd>Clic / E</kbd> Examinar</div>
+      <div><kbd>N</kbd> Cuaderno</div>
+      <div><kbd>Esc</kbd> Cerrar paneles</div>
+      <div><kbd>⇧</kbd> Caminar rápido</div>
+    </div>
+    <button class="btn" id="btnStart">Abrir la consulta</button>
+    <p class="fine" id="loadMsg"></p>
+    <p class="fine">PISTAS LIBRES: la pizarra y el archivo de historiales. · 6 pistas en total.</p>
+  </div>
+</div>
+
+<!-- CASO -->
+<div class="overlay dim gone" id="panelCase"><div class="sheet" id="sheet"></div></div>
+
+<!-- KEYPAD -->
+<div class="overlay dim gone" id="panelKeypad">
+  <div class="keypad">
+    <div class="kp-title">TECLADO DE SALIDA</div>
+    <div class="kp-display" id="kpDisplay">–––––</div>
+    <div class="kp-hint" id="kpHint"></div>
+    <div class="kp-grid" id="kpGrid"></div>
+    <button class="close-x" id="kpClose"><i data-lucide="x"></i></button>
+  </div>
+</div>
+
+<!-- CUADERNO -->
+<div class="overlay dim gone" id="panelNotes">
+  <div class="notes" id="notesBody"></div>
+</div>
+
+<!-- FINAL -->
+<div class="overlay gone" id="screenEnd" style="z-index:95">
+  <div class="frame" style="border-color:#4a5a44">
+    <div class="kicker" style="color:#7fae6d">CÓDIGO ACEPTADO · 23:47 → AMANECER</div>
+    <div class="endtitle">Consulta <em>desbloqueada</em></div>
+    <div class="endstats">
+      <div><b id="endTime">—</b><span>TIEMPO EN SALA</span></div>
+      <div><b id="endHints">—</b><span>PISTAS USADAS</span></div>
+      <div><b id="endMiss">—</b><span>ERRORES CLÍNICOS</span></div>
+    </div>
+    <div class="sec-label" style="border-color:#3a4032;color:#7fae6d">LO QUE TE LLEVAS DEL TURNO</div>
+    <ul class="learn" id="endLearn"></ul>
+    <button class="btn" id="btnAgain" style="margin-top:20px">Repetir la ronda</button>
+  </div>
+</div>
+
+<div id="toasts"></div>
+<div id="fade"></div>
+<div id="stick"><div id="stickKnob"></div></div>
+<button id="btnAct"><i data-lucide="eye"></i></button>
+
+<script src="https://cdn.jsdelivr.net/npm/lucide@0.294.0/dist/umd/lucide.min.js"></script>
+
+<!-- Puente de arranque: el botón siempre responde aunque el motor tarde -->
+<script>
+(function(){
+  var btn = document.getElementById('btnStart');
+  var msg = document.getElementById('loadMsg');
+  var label = btn.innerHTML;
+  var wantStart = false;
+  btn.addEventListener('click', function(){
+    if (window.__startGame) { window.__startGame(); return; }
+    wantStart = true;
+    btn.disabled = true;
+    btn.textContent = 'Cargando motor 3D…';
+    msg.textContent = 'Descargando three.js desde el CDN…';
+  });
+  window.__engineReady = function(){
+    btn.disabled = false;
+    btn.innerHTML = label;
+    msg.textContent = '';
+    if (wantStart && window.__startGame) window.__startGame();
+  };
+  window.__engineError = function(m){
+    btn.disabled = true;
+    btn.textContent = 'No se puede iniciar';
+    msg.innerHTML = m;
+  };
+  setTimeout(function(){
+    if (!window.__engineOK) {
+      window.__engineError('No se pudo cargar el motor 3D. Comprueba tu <b>conexión a internet</b> y recarga con Ctrl+F5. Si sigue fallando, abre la consola (F12) y pásame el error.');
+    }
+  }, 12000);
+})();
+</script>
+
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+
+/* ================================================================
+   1. DATOS CLÍNICOS — los 5 expedientes (todos con step:0)
+================================================================ */
+const CODE = '47293';
+const CASES = [
+{ id:'lola', num:'01', step:0, station:'MESA DE EXPLORACIÓN', pet:'LOLA', meta:'Caniche · 11 años · 8 kg',
+  title:'Poliuria y polidipsia de tres semanas',
+  anamnesis:'Bebe y orina sin parar desde hace tres semanas. Come con buen apetito pero ha perdido 1,8 kg. Letargia creciente y alopecia troncal simétrica. La propietaria trae una foto del bebedero: vacío dos veces al día.',
+  lab:[['Glucosa','386 mg/dL','70 – 110','hi'],['Glucosuria','++++','negativa','hi'],['Cetonas en orina','negativas','negativas',''],['Fructosamina','512 µmol/L','200 – 360','hi'],['Urea / Creatinina','32 / 1,0 mg/dL','normales','']],
+  steps:[
+    {t:'choice', q:'Hiperglucemia de 386 mg/dL, glucosuria ++++ y fructosamina elevada. ¿Cuál es la interpretación más probable?',
+     opts:['Hiperglucemia transitoria por estrés de la consulta','Diabetes mellitus: hiperglucemia sostenida que supera el umbral renal','Diabetes insípida central','Insuficiencia renal crónica descompensada'], correct:1,
+     why:'La fructosamina integra la glucemia de las últimas 1–2 semanas: si está alta, la hiperglucemia es sostenida y no un artefacto de estrés. Con glucosuria persistente (umbral renal ≈ 180–220 mg/dL), todo apunta a diabetes mellitus.'},
+    {t:'choice', q:'¿Qué mide realmente la fructosamina?',
+     opts:['La función renal','Las reservas pancreáticas de insulina','La glucemia media de las últimas 1–2 semanas','El grado de cetoacidosis'], correct:2,
+     why:'Es glucosilación no enzimática de proteínas séricas: refleja la glucemia media de 1–2 semanas. Es la aliada para distinguir estrés de diabetes y para seguir el control glucémico.'},
+    {t:'input', q:'Empiezas insulina a 0,25 UI/kg cada 12 h. Lola pesa 8 kg. ¿Cuántas UI administrarás por dosis?', ans:2, tol:0.26, unit:'UI',
+     why:'0,25 UI/kg × 8 kg = 2 UI cada 12 h por vía subcutánea. La dosis inicial canina habitual es 0,25–0,5 UI/kg, siempre con curva glucémica de seguimiento.'}
+  ],
+  digit:'4',
+  pearl:'<b>Diabetes canina:</b> fructosamina alta + glucosuria = hiperglucemia real, no estrés. Dosis inicial de insulina: 0,25–0,5 UI/kg SC cada 12 h.',
+  hints:['La tríada es inequívoca: hiperglucemia + glucosuria + fructosamina alta. ¿Qué diagnóstico reúne las tres a la vez?','La dosis es una regla de tres: 0,25 UI por cada kilo… y Lola pesa 8 kg.'] },
+
+{ id:'simba', num:'02', step:0, station:'PANTALLA DE RADIOLOGÍA', pet:'SIMBA', meta:'Mestizo · 13 años · 4,5 kg · felino',
+  title:'Disnea de inicio brusco',
+  anamnesis:'Tres días de letargia y esta tarde disnea súbita: 60 rpm, patrón restrictivo, murmullos ventrales apagados y tolerancia cero a la manipulación. Cada vez que lo contienes, la frecuencia sube.',
+  lab:[['Frecuencia respiratoria','60 rpm','20 – 40','hi'],['Murmullos ventrales','disminuidos','normales','lo'],['SpO₂ (sin estrés)','90 %','> 95 %','lo'],['NT-proBNP puntual','elevado','< 100 pmol/L','hi']],
+  steps:[
+    {t:'choice', q:'Observa la placa de tórax (proyección lateral). ¿Qué describe mejor la imagen?',
+     opts:['Neumotórax: colapso pulmonar y aire libre en cavidad pleural','Derrame pleural: retracción lobular, velos interlobulares y silueta cardiaca aumentada','Patrón bronquial difuso en «vías del tren»','Cuerpo extraño esofágico con dilatación'], correct:1,
+     why:'Los lóbulos pulmonares se retraen de la pared costal y sus bordes se redondean («signo de la hoja enrollada»), con velos interlobulares entre ellos. La silueta cardiaca, elevada y agrandada, orienta a cardiomegalia.'},
+    {t:'choice', q:'Ante este gato disneico en jaula, ¿cuál es el siguiente paso más seguro y rentable?',
+     opts:['Toracocentesis terapéutica y diagnóstica en decúbito esternal','Completar radiografías en decúbito dorsal con contención','Broncoscopia bajo sedación profunda','Antibióticos empíricos y reevaluar en 48 h'], correct:0,
+     why:'En gatos disneicos el estrés mata. La toracocentesis en esternón es rápida, mínimamente estresante y a la vez diagnóstica y terapéutica: puede evitar que el paciente muera en la mesa de radiología.'},
+    {t:'choice', q:'El líquido obtenido es un trasudado puro (proteínas < 15 g/L, celularidad escasa). Causa más probable en este gato:',
+     opts:['Linfoma mediastínico','Piotórax','Insuficiencia cardíaca congestiva por miocardiopatía','Quilotórax traumático'], correct:2,
+     why:'El trasudado puro es el derrame típico de la insuficiencia cardíaca congestiva felina (miocardiopatía). Coherente con NT-proBNP elevado y silueta cardiaca aumentada.'}
+  ],
+  digit:'7',
+  pearl:'<b>Gato disneico + derrame pleural:</b> toracocentesis antes de manipular. Trasudado puro → piensa en insuficiencia cardíaca congestiva.',
+  hints:['Mira los bordes del pulmón: se alejan de la pared costal y sus márgenes se redondean. En el neumotórax el pulmón colapsa hacia el hilio, no se vela.','Regla de oro felina: oxígeno y mínimo estrés primero. Una aguja puede diagnosticar y tratar en el mismo gesto.'] },
+
+{ id:'rocky', num:'03', step:0, station:'MICROSCOPIO', pet:'ROCKY', meta:'Cocker spaniel · 6 años · 24 kg',
+  title:'Letargia, ictericia y orinas oscuras',
+  anamnesis:'Dos días de decaimiento, orinas oscuras y rechazo del paseo. Mucosas pálidas-ictéricas, 140 lpm, soplo funcional II/VI. No hay sangrados externos ni melena. La extensión sanguínea ya está en la platina.',
+  lab:[['Hematocrito','14 %','37 – 55','lo'],['Reticulocitos','180 000/µL','< 60 000','hi'],['Bilirrubina total','3,4 mg/dL','0,1 – 0,6','hi'],['Hemoglobinuria','positiva','negativa','hi'],['Test de Coombs','positivo','negativo','hi'],['Autoaglutinación','positiva macroscópica','negativa','hi']],
+  steps:[
+    {t:'micro', q:'Examina el campo a ×1000 y marca los 6 esferocitos: células pequeñas, densas y SIN palidez central.', need:6},
+    {t:'choice', q:'Anemia regenerativa + esferocitos + Coombs positivo + hemoglobinuria, sin sangrado externo. Diagnóstico:',
+     opts:['Anemia ferropénica por parasitismo','Insuficiencia renal crónica','Intoxicación por cebolla','Anemia hemolítica inmune-mediada (AHAI)'], correct:3,
+     why:'Los esferocitos son eritrocitos que han perdido membrana al ser parcialmente fagocitados por macrófagos esplénicos: el sello morfológico de la hemólisis inmune. El Coombs confirma anticuerpos unidos a la superficie del glóbulo rojo.'},
+    {t:'choice', q:'¿Qué dato distingue mejor la HEMÓLISIS de una hemorragia como causa de anemia?',
+     opts:['Bilirrubina y hemoglobinuria elevadas sin pérdida externa de sangre','Que el hematocrito esté bajo','Las mucosas pálidas','La taquicardia compensadora'], correct:0,
+     why:'Ambas anemian, pero solo la hemólisis libera hemoglobina hacia el plasma (hemoglobinuria) y satura el metabolismo de la bilirrubina, sin sangrado externo ni cavitario.'}
+  ],
+  digit:'2',
+  pearl:'<b>AHAI canina:</b> esferocitos + autoaglutinación + Coombs positivo = anemia hemolítica inmune. Antes de llamarla «primaria», descarta fármacos, tóxicos, infecciones y neoplasia.',
+  hints:['Los esferocitos son los puntos más pequeños y oscuros del campo. La palidez central es la pista: los eritrocitos normales la tienen; los esferocitos, no.','Sangre destruida dentro del propio cuerpo: bilirrubina y hemoglobinuria suben sin ninguna hemorragia. El sistema inmune está confundiendo los glóbulos rojos con el enemigo.'] },
+
+{ id:'nube', num:'04', step:0, station:'BOTIQUÍN DE FÁRMACOS', pet:'NUBE', meta:'Mestiza · 2 años · 3 kg · felina',
+  title:'Ataxia «de borracha» tras escapar al garaje',
+  anamnesis:'Se escapó esta tarde al garaje. La encuentran atáxica, vomitando y con mucha sed; junto a ella, un charco dulzón de anticongelante. Hace unas 6 horas. Taquipnea y deshidratación ~7 %.',
+  lab:[['Na / K','138 / 3,6 mEq/L','145 / 4',''],['Cloro','98 mEq/L','105 – 115','lo'],['HCO₃','10 mEq/L','18 – 26','lo'],['Urea / Creatinina','78 / 2,1 mg/dL','en ascenso','hi'],['Glucosa','145 mg/dL','70 – 150',''],['Sedimento urinario','cristales de oxalato cálcico (monohidrato)','ausentes','hi']],
+  steps:[
+    {t:'input', q:'Calcula la brecha aniónica: [Na⁺] − ([Cl⁻] + [HCO₃⁻]). Introduce el resultado en mEq/L.', ans:30, tol:1.2, unit:'mEq/L',
+     why:'138 − (98 + 10) = 30 mEq/L. El rango normal ronda 12–25: una brecha de 30 significa que hay ácidos no medidos circulando en sangre.'},
+    {t:'choice', q:'¿Qué ácido no medido explica esta brecha aniónica elevada?',
+     opts:['Ácido láctico por hipoperfusión aislada','Cetoácidos por ayuno','Los metabolitos del etilenglicol: glicolato y oxalato','Ácido úrico'], correct:2,
+     why:'El etilenglicol se metaboliza por la alcohol-deshidrogenasa a glicolato (acidosis metabólica) y oxalato, que precipita como cristales de oxalato cálcico en el túbulo renal: exactamente lo que muestra su sedimento.'},
+    {t:'choice', q:'El antídoto de elección disponible en tu botiquín:',
+     opts:['N-acetilcisteína','Vitamina K1','Fomepizol','Atipamezol'], correct:2,
+     why:'El fomepizol bloquea la alcohol-deshidrogenasa e impide la formación de metabolitos tóxicos. Cada hora cuenta: si se trata antes de la falla renal establecida, el pronóstico es bueno. Fluidoterapia agresiva como soporte.'}
+  ],
+  digit:'9',
+  pearl:'<b>Etilenglicol:</b> ataxia «de borracho» + acidosis con brecha elevada + cristales de oxalato cálcico. Fomepizol cuanto antes, más fluidoterapia intensiva.',
+  hints:['La fórmula está en la pregunta: Na − (Cl + HCO₃). Haz la cuenta con 138, 98 y 10.','La brecha la produce el anticongelante. Buscas el fármaco que frena su metabolismo: un inhibidor de la alcohol-deshidrogenasa.'] },
+
+{ id:'kiara', num:'05', step:0, station:'ORDENADOR DE LABORATORIO', pet:'KIARA', meta:'Mestiza · 5 años · 18 kg',
+  title:'Vómitos, debilidad episódica y pulso fino',
+  anamnesis:'Semanas de vómitos intermitentes, diarrea y adelgazamiento, con episodios de debilidad que asustan a la propietaria. Hoy llega letárgica, con pulso fino y deshidratación ~8 %. Curiosamente, sin leucograma de estrés.',
+  lab:[['Sodio','128 mEq/L','142 – 152','lo'],['Potasio','6,4 mEq/L','3,8 – 5,5','hi'],['Cloro','92 mEq/L','106 – 116','lo'],['Glucosa','62 mg/dL','70 – 110','lo'],['Leucograma','sin estrés','—',''],['Cortisol post-ACTH','< 1 µg/dL','> 2','lo']],
+  steps:[
+    {t:'input', q:'Calcula el ratio Na:K. Introduce el resultado con un decimal.', ans:20, tol:0.55, unit:'',
+     why:'128 ÷ 6,4 = 20,0. Un ratio < 27 (hiponatremia + hiperkalemia) tiene ~90 % de sensibilidad para hipoadrenocorticismo, aunque también puede verse en otras azotemias e hipoadrenocorticismo atípico.'},
+    {t:'choice', q:'Con un potasio de 6,4 mEq/L, ¿qué cambios electrocardiográficos son los esperables?',
+     opts:['Taquicardia sinusal con ondas P altas y estrechas','Bradicardia, ondas T picadas y ondas P aplanadas o ausentes','Fibrilación auricular con respuesta ventricular rápida','Alternancia de complejos QRS gigantes'], correct:1,
+     why:'La hiperkalemia pictea las ondas T, aplana y hace desaparecer las ondas P, ensancha el QRS y frena la frecuencia. Es una emergencia cardiaca silenciosa: monitoriza el ECG mientras tratas.'},
+    {t:'choice', q:'Tu primera intervención, ya, antes de cualquier confirmación:',
+     opts:['Suero glucosado al 5 % solo','Suero salino fisiológico 0,9 % intravenoso','Furosemida intravenosa','Insulina con dextrosa como único tratamiento'], correct:1,
+     why:'El salino 0,9 % restaura el volumen circulante, corrige la hiponatremia y diluye el potasio. Después vendrá el aporte mineralocorticoide (DOCP o fludrocortisona) de por vida.'}
+  ],
+  digit:'3',
+  pearl:'<b>Enfermedad de Addison:</b> Na:K < 27, sin leucograma de estrés y con hipoglucemia → sospecha hipoadrenocorticismo. Salino 0,9 % primero; la prueba de ACTH puede esperar.',
+  hints:['Divide 128 entre 6,4. ¿Te queda por encima o por debajo de 27?','El corazón lo grita en el ECG: T picadas, P que desaparece, bradicardia. Y lo que ese corazón pide es… suero salino.'] }
+];
+
+/* ================================================================
+   2. ESTADO Y UTILIDADES (con reporte de errores visible)
+================================================================ */
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const state = {
+  started:false, uiOpen:false, won:false, winning:false, winT:0,
+  hintsLeft:6, mistakes:0, t0:0,
+  resolved:new Set(), freeHints:new Set(),
+  winStart:null, winYawA:0
+};
+const IS_TOUCH = matchMedia('(pointer: coarse)').matches;
+if (IS_TOUCH) document.body.classList.add('touch');
+
+function refreshIcons(){ try{ window.lucide && window.lucide.createIcons(); }catch(e){} }
+
+let lastErrT = 0;
+function reportErr(err, where){
+  try{ console.error('[EscapeRoom] ' + (where||''), err); }catch(e){}
+  const now = Date.now();
+  if(now - lastErrT < 2500) return;
+  lastErrT = now;
+  toast('<b>Fallo ' + esc(where||'interno') + ':</b> ' + esc(err && err.message ? err.message : err) + ' — pásame este texto si persiste.', 'alert-triangle', 7000, true);
+}
+window.addEventListener('error', e => reportErr(e.error || (e && e.message) || 'desconocido', 'global'));
+window.addEventListener('unhandledrejection', e => reportErr(e.reason || 'promesa rechazada', 'async'));
+
+function toast(msg, icon='info', dur=4200, isErr=false){
+  const d = document.createElement('div');
+  d.className = 'toast' + (isErr ? ' err' : '');
+  d.innerHTML = `<i data-lucide="${icon}"></i><div>${msg}</div>`;
+  $('#toasts').appendChild(d);
+  refreshIcons();
+  setTimeout(()=>{ d.classList.add('out'); setTimeout(()=>d.remove(), 450); }, dur);
+}
+const fmt = s => `${String(Math.floor(s/60)).padStart(2,'0')}:${String(Math.floor(s%60)).padStart(2,'0')}`;
+
+const SFX = {
+  ctx:null, muted:false,
+  ensure(){ if(!this.ctx){ try{ this.ctx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } if(this.ctx&&this.ctx.state==='suspended') this.ctx.resume(); },
+  tone(f, dur=0.12, type='sine', g=0.08, when=0){
+    if(!this.ctx||this.muted) return;
+    try{
+      const t = this.ctx.currentTime + when;
+      const o = this.ctx.createOscillator(), gn = this.ctx.createGain();
+      o.type=type; o.frequency.value=f;
+      gn.gain.setValueAtTime(g,t); gn.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+      o.connect(gn).connect(this.ctx.destination); o.start(t); o.stop(t+dur+0.02);
+    }catch(e){}
+  },
+  key(){ this.tone(880,0.06,'square',0.04); },
+  ok(){ this.tone(523,0.1,'sine',0.09); this.tone(659,0.1,'sine',0.09,0.09); this.tone(784,0.22,'sine',0.1,0.18); },
+  bad(){ this.tone(160,0.25,'sawtooth',0.06); },
+  pick(){ this.tone(1200,0.05,'sine',0.05); },
+  hint(){ this.tone(740,0.14,'triangle',0.07); this.tone(988,0.18,'triangle',0.06,0.12); },
+  win(){ [392,523,659,784,1046].forEach((f,i)=>this.tone(f,0.5,'sine',0.09,i*0.13)); }
+};
+
+function lockPointer(){
+  try{
+    const p = $('#scene').requestPointerLock();
+    if(p && p.catch) p.catch(()=>{});
+  }catch(e){}
+}
+
+/* ================================================================
+   3. ESCENA
+================================================================ */
+try {
+
+const canvas = $('#scene');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.12;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0d100c);
+const camera = new THREE.PerspectiveCamera(70, innerWidth/innerHeight, 0.05, 60);
+camera.rotation.order = 'YXZ';
+camera.position.set(-0.4, 1.6, -1.9);
+let yaw = Math.PI, pitch = -0.04;
+camera.rotation.y = yaw; camera.rotation.x = pitch;
+state.winStart = new THREE.Vector3();
+
+const M = (color, r=0.85, m=0) => new THREE.MeshStandardMaterial({color, roughness:r, metalness:m});
+function box(w,h,d,mat,x=0,y=0,z=0,parent=scene){
+  const ms = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
+  ms.position.set(x,y,z); ms.castShadow = ms.receiveShadow = true; parent.add(ms); return ms;
+}
+function cyl(rt,rb,h,mat,x=0,y=0,z=0,parent=scene,seg=20){
+  const ms = new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,seg), mat);
+  ms.position.set(x,y,z); ms.castShadow = ms.receiveShadow = true; parent.add(ms); return ms;
+}
+function rr(x,rx,ry,rw,rh,rad){
+  x.beginPath();
+  if(x.roundRect){ x.roundRect(rx,ry,rw,rh,rad); return; }
+  x.moveTo(rx+rad,ry);
+  x.arcTo(rx+rw,ry,rx+rw,ry+rh,rad);
+  x.arcTo(rx+rw,ry+rh,rx,ry+rh,rad);
+  x.arcTo(rx,ry+rh,rx,ry,rad);
+  x.arcTo(rx,ry,rx+rw,ry,rad);
+  x.closePath();
+}
+const redraws = [];
+function canvasTex(w,h,draw){
+  const c = document.createElement('canvas'); c.width=w; c.height=h;
+  const ctx = c.getContext('2d'); draw(ctx,w,h);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  return {tex:t, canvas:c, redraw(){ try{ draw(ctx,w,h); t.needsUpdate = true; }catch(e){} }};
+}
+if(document.fonts && document.fonts.ready) document.fonts.ready.then(()=> redraws.forEach(f=>f()));
+
+const interactMeshes = [];
+const colliders = [];
+function addCollider(cx,cz,w,d){ colliders.push({x1:cx-w/2, x2:cx+w/2, z1:cz-d/2, z2:cz+d/2}); }
+function registerInteract(root, name, sub, action){
+  const it = {root, name, sub, action, mats:new Set()};
+  root.traverse(o=>{ if(o.isMesh){ o.userData.it = it; interactMeshes.push(o);
+    if(o.material && o.material.emissive) it.mats.add(o.material); } });
+  it.mats.forEach(m=>m.userData.base = m.emissive.getHex());
+}
+
+/* ================================================================
+   4. CONSTRUCCIÓN DE LA CONSULTA
+================================================================ */
+const ROOM = {W:12, D:9, H:3.2};
+
+function buildRoom(){
+  const f = canvasTex(256,256,(x)=>{
+    x.fillStyle='#b6b9ab'; x.fillRect(0,0,256,256);
+    for(let i=0;i<4;i++)for(let j=0;j<4;j++){
+      x.fillStyle = (i+j)%2 ? '#b0b3a5' : '#bcbfb1'; x.fillRect(i*64,j*64,64,64);
+      for(let k=0;k<40;k++){ x.fillStyle=`rgba(90,95,85,${Math.random()*0.12})`;
+        x.fillRect(i*64+Math.random()*60, j*64+Math.random()*60, 2, 2); }
+    }
+    x.strokeStyle='#8e9284'; x.lineWidth=3;
+    for(let i=0;i<=4;i++){ x.beginPath();x.moveTo(i*64,0);x.lineTo(i*64,256);x.stroke();
+      x.beginPath();x.moveTo(0,i*64);x.lineTo(256,i*64);x.stroke(); }
+  });
+  f.tex.wrapS = f.tex.wrapT = THREE.RepeatWrapping; f.tex.repeat.set(4,3);
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.W,ROOM.D), new THREE.MeshStandardMaterial({map:f.tex, roughness:0.55, metalness:0.05}));
+  floor.rotation.x = -Math.PI/2; floor.receiveShadow = true; scene.add(floor);
+
+  const wallM = M(0x8e9682,0.92);
+  const mkWall = (w,x,z,ry)=>{ const p = box(w,ROOM.H,0.12,wallM,x,ROOM.H/2,z); p.rotation.y = ry; };
+  mkWall(ROOM.W, 0, ROOM.D/2, 0);
+  mkWall(ROOM.D, -ROOM.W/2, 0, Math.PI/2);
+  mkWall(ROOM.D,  ROOM.W/2, 0, Math.PI/2);
+  const southL = (-ROOM.W/2 + -2.2)/2, southR = (-1.1 + ROOM.W/2)/2;
+  box((-2.2) - (-ROOM.W/2), ROOM.H, 0.12, wallM, southL, ROOM.H/2, -ROOM.D/2);
+  box(ROOM.W/2 - (-1.1), ROOM.H, 0.12, wallM, southR, ROOM.H/2, -ROOM.D/2);
+  box(1.1, 0.5, 0.12, wallM, -1.65, 2.45, -ROOM.D/2);
+  const ceil = box(ROOM.W, 0.1, ROOM.D, M(0xe7e3d6,0.95), 0, ROOM.H+0.05, 0); ceil.castShadow=false;
+  const zk = M(0x454b40,0.8);
+  box(ROOM.W,0.14,0.05,zk,0,0.07,ROOM.D/2-0.08); box(ROOM.D,0.14,0.05,zk,-ROOM.W/2+0.08,0.07,0).rotation.y=Math.PI/2;
+  box(ROOM.D,0.14,0.05,zk,ROOM.W/2-0.08,0.07,0).rotation.y=Math.PI/2;
+  const led = new THREE.MeshStandardMaterial({color:0xfff6e2, emissive:0xfff3dc, emissiveIntensity:1.4});
+  [-2.5,2.5].forEach(px=> box(1.7,0.05,0.55, led, px, ROOM.H-0.02, 0.4));
+
+  box(3,2.4,0.1, M(0x151812,0.95), -1.65, 1.2, -6.2);
+  box(0.15,2.4,1.8, M(0x1a1e16,0.95), -3.1, 1.2, -5.3);
+  box(0.15,2.4,1.8, M(0x1a1e16,0.95), -0.2, 1.2, -5.3);
+  window.extLight = new THREE.PointLight(0xf4edff, 0, 8, 1.6);
+  extLight.position.set(-1.65,1.7,-5.4); scene.add(extLight);
+}
+
+function buildLights(){
+  scene.add(new THREE.HemisphereLight(0xfff1d8, 0x3a3f35, 0.55));
+  scene.add(new THREE.AmbientLight(0x38342a, 0.5));
+  const p1 = new THREE.PointLight(0xffe6bd, 16, 11, 1.8); p1.position.set(-2.6,3.0,0.6); scene.add(p1);
+  const p2 = new THREE.PointLight(0xffe6bd, 14, 11, 1.8); p2.position.set(2.6,3.0,-0.4); scene.add(p2);
+  const spot = new THREE.SpotLight(0xffdba4, 60, 10, 0.62, 0.5, 1.5);
+  spot.position.set(-3.6, 2.85, 1.2); spot.target.position.set(-3.6, 0.9, 1.2);
+  spot.castShadow = true; spot.shadow.mapSize.set(1024,1024); spot.shadow.bias = -0.0004;
+  scene.add(spot, spot.target);
+  const rx = new THREE.PointLight(0x66d5e0, 5, 3.6, 2); rx.position.set(2.6,1.5,-3.5); scene.add(rx);
+  const ken = new THREE.PointLight(0xffd9a0, 3.2, 2.4, 2); ken.position.set(1.3,1.6,3.95); scene.add(ken);
+}
+
+let doorGroup, rxScreenMat, monitorMat;
+let dogTail, dogBody, catHead, catEyes=[], clockHand;
+
+function buildExamTable(){
+  const g = new THREE.Group(); g.position.set(-3.6,0,1.2); scene.add(g);
+  const pad = M(0x2f5d5a,0.7);
+  box(0.7,0.12,1.55, pad, 0,0.88,0, g);
+  const legM = M(0xb9bec4,0.35,0.8);
+  [[-.28,-.68],[.28,-.68],[-.28,.68],[.28,.68]].forEach(([x,z])=>{
+    cyl(0.03,0.045,0.82, legM, x,0.41,z, g);
+    cyl(0.16,0.16,0.03, legM, x,0.02,z, g);
+  });
+  addCollider(-3.6,1.2,1.0,1.8);
+  cyl(0.02,0.02,0.5, legM, -3.6,3.0,1.2);
+  cyl(0.28,0.12,0.22, M(0x30352c,0.6), -3.6,2.72,1.2);
+  cyl(0.05,0.05,0.02, new THREE.MeshStandardMaterial({color:0xfff2cf,emissive:0xffe9b0,emissiveIntensity:2.4}), -3.6,2.63,1.2);
+  const dog = new THREE.Group(); dog.position.set(0,0.94,0.1); g.add(dog);
+  const fur = M(0xd9a05b,0.95), dark = M(0x8a5a2b,0.9);
+  dogBody = cyl(0.13,0.14,0.4, fur, 0,0.16,0, dog); dogBody.rotation.x = Math.PI/2;
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.115,18,14), fur); head.position.set(0,0.34,-0.22); head.castShadow=true; dog.add(head);
+  box(0.09,0.07,0.1, fur, 0,0.3,-0.33, dog);
+  const nose = new THREE.Mesh(new THREE.SphereGeometry(0.02,10,8), dark); nose.position.set(0,0.32,-0.38); dog.add(nose);
+  [[-0.07],[0.07]].forEach(([x])=>{ box(0.045,0.13,0.07, fur, x,0.28,-0.2, dog).rotation.z = x>0?-0.25:0.25; });
+  [[-0.05],[0.05]].forEach(([x])=>{ const e=new THREE.Mesh(new THREE.SphereGeometry(0.014,8,8), M(0x1c1c1c,0.4)); e.position.set(x,0.37,-0.3); dog.add(e); });
+  [[-0.08,-0.12],[0.08,-0.12],[-0.08,0.14],[0.08,0.14]].forEach(([x,z])=> cyl(0.028,0.028,0.16, fur, x,0.08,z, dog));
+  dogTail = cyl(0.015,0.028,0.16, fur, 0,0.24,0.26, dog); dogTail.rotation.x = 0.9;
+  registerInteract(g, 'Mesa de exploración · Lola', 'CASO 01 — clic o E para abrir el expediente', ()=>openCase('lola'));
+}
+
+function drawXray(x,w,h){
+  x.fillStyle='#04141a'; x.fillRect(0,0,w,h);
+  x.save(); x.shadowBlur = 26;
+  const cx=w/2;
+  x.shadowColor='rgba(140,190,205,.5)'; x.fillStyle='rgba(120,175,190,.32)';
+  x.beginPath(); x.ellipse(cx, h*0.46, w*0.3, h*0.3, 0, 0, 7); x.fill();
+  x.shadowColor='rgba(200,230,240,.6)'; x.fillStyle='rgba(205,230,240,.75)';
+  for(let i=0;i<8;i++){ rr(x, cx-9, h*0.16+i*h*0.075, 18, h*0.05, 5); x.fill(); }
+  x.strokeStyle='rgba(180,215,225,.4)'; x.lineWidth=7;
+  for(let i=0;i<8;i++){ x.beginPath(); x.ellipse(cx, h*0.22+i*h*0.062, w*0.27-i*3, h*0.1, 0, Math.PI*0.15, Math.PI*0.85, true); x.stroke(); }
+  x.fillStyle='rgba(225,240,246,.8)'; x.shadowColor='rgba(225,240,246,.9)';
+  x.beginPath(); x.ellipse(cx-w*0.1, h*0.42, w*0.15, h*0.17, 0.15, 0, 7); x.fill();
+  const grad = x.createLinearGradient(0,h*0.52,0,h*0.86);
+  grad.addColorStop(0,'rgba(225,240,246,0)'); grad.addColorStop(1,'rgba(225,240,246,.85)');
+  x.fillStyle=grad; x.fillRect(w*0.06,h*0.52,w*0.88,h*0.34);
+  x.strokeStyle='rgba(240,250,255,.65)'; x.lineWidth=3;
+  [0.62,0.72].forEach((yy,i)=>{ x.beginPath(); x.moveTo(w*0.1, h*yy); x.quadraticCurveTo(cx, h*(yy-0.045), w*0.9, h*(yy-0.02+i*0.02)); x.stroke(); });
+  x.restore();
+  x.fillStyle='rgba(140,210,225,.85)'; x.font='600 15px monospace';
+  x.fillText('SIMBA · TÓRAX LATERAL', 18, 28);
+  x.font='12px monospace'; x.fillStyle='rgba(140,210,225,.5)';
+  x.fillText('23:52 · kVp 68 · 4,5 kg', 18, 48);
+  x.fillText('R', w-30, h-16);
+}
+function buildRadiology(){
+  const g = new THREE.Group(); g.position.set(2.6,0,-4.02); scene.add(g);
+  box(1.8,0.78,0.6, M(0x8a6a45,0.7), 0,0.39,0, g);
+  const tex = canvasTex(900,600,drawXray);
+  rxScreenMat = new THREE.MeshStandardMaterial({map:tex.tex, emissive:0xffffff, emissiveMap:tex.tex, emissiveIntensity:0.95, color:0x111111, roughness:0.4});
+  box(1.3,0.06,0.45, M(0x22262c,0.4,0.5), -0.1,0.82,-0.05, g);
+  const scr = box(1.25,0.85,0.05, rxScreenMat, -0.1,1.28,-0.03, g); scr.rotation.x = -0.12;
+  box(1.25,0.05,0.28, M(0x22262c,0.4,0.5), -0.1,0.86,0.1, g);
+  box(0.35,0.02,0.14, M(0x3a3f46,0.5,0.4), -0.1,0.845,0.12, g);
+  addCollider(2.6,-4.02,2.0,0.9);
+  registerInteract(g, 'Estación de radiología', 'CASO 02 — clic o E para ver la placa de Simba', ()=>openCase('simba'));
+}
+
+function buildLabDesk(){
+  const g = new THREE.Group(); g.position.set(5.42,0,0.4); scene.add(g);
+  const wood = M(0x9a7b52,0.65);
+  box(0.75,0.05,1.7, wood, 0,0.76,0, g);
+  [[-0.3,-0.75],[0.3,-0.75],[-0.3,0.75],[0.3,0.75]].forEach(([x,z])=> box(0.05,0.74,0.05, wood, x,0.38,z, g));
+  const lt = canvasTex(512,340,(x,w,h)=>{
+    x.fillStyle='#0b1512'; x.fillRect(0,0,w,h);
+    x.fillStyle='#7ee0a8'; x.font='600 26px monospace';
+    x.fillText('SYS·LAB v2.4', 24, 44);
+    x.font='16px monospace'; x.fillStyle='#3f8f63';
+    x.fillText('──────────────────────────', 24, 70);
+    x.fillStyle='#7ee0a8';
+    const rows = ['FICHA 05 · KIARA  ........ PENDIENTE','Na 128   K 6.4   Cl 92','GLU 62   ACTH  <1','──────────────────────────','FICHA 01 · LOLA   ........ PENDIENTE','FICHA 04 · NUBE   ........ PENDIENTE','──────────────────────────','> _'];
+    rows.forEach((r,i)=> x.fillText(r, 24, 100+i*26));
+  });
+  monitorMat = new THREE.MeshStandardMaterial({map:lt.tex, emissive:0xffffff, emissiveMap:lt.tex, emissiveIntensity:0.8, color:0x101010, roughness:0.4});
+  box(0.6,0.4,0.05, monitorMat, -0.02,1.06,0.1, g);
+  box(0.62,0.42,0.04, M(0x22262c,0.4,0.5), -0.02,1.06,0.06, g);
+  box(0.1,0.16,0.1, M(0x22262c,0.4,0.5), -0.02,0.86,0.08, g);
+  box(0.5,0.02,0.18, M(0x3a3f46,0.5,0.4), -0.02,0.795,0.12, g);
+  box(0.16,0.4,0.5, M(0x2c2f33,0.5,0.3), 0.28,0.98,-0.45, g);
+  addCollider(5.42,0.4,0.9,1.9);
+  registerInteract(g, 'Ordenador de laboratorio', 'CASO 05 — clic o E para abrir la ficha de Kiara', ()=>openCase('kiara'));
+}
+
+function buildMicro(){
+  const g = new THREE.Group(); g.position.set(4.25,0,3.8); scene.add(g);
+  const wood = M(0x9a7b52,0.65);
+  box(0.85,0.05,0.85, wood, 0,0.74,0, g);
+  [[-0.36,-0.36],[0.36,-0.36],[-0.36,0.36],[0.36,0.36]].forEach(([x,z])=> cyl(0.025,0.03,0.72, wood, x,0.36,z, g));
+  const g2 = new THREE.Group(); g2.position.set(0,0.765,0); g.add(g2);
+  const metal = M(0x3a3f46,0.35,0.7);
+  box(0.2,0.04,0.26, metal, 0,0.02,0, g2);
+  const arm = box(0.06,0.26,0.1, metal, -0.06,0.16,-0.05, g2); arm.rotation.x = -0.2;
+  const tube = cyl(0.035,0.035,0.2, metal, 0,0.24,0.02, g2); tube.rotation.x = 0.35;
+  cyl(0.045,0.045,0.05, metal, 0,0.33,0.055, g2).rotation.x = 0.35;
+  box(0.14,0.02,0.12, metal, 0,0.1,0.03, g2);
+  cyl(0.03,0.03,0.01, new THREE.MeshStandardMaterial({color:0xfff6d8,emissive:0xffedb8,emissiveIntensity:2}), 0,0.05,0.03, g2);
+  addCollider(4.25,3.8,1.0,1.0);
+  registerInteract(g, 'Microscopio', 'CASO 03 — clic o E para examinar la extensión de Rocky', ()=>openCase('rocky'));
+}
+
+function buildShelf(){
+  const g = new THREE.Group(); g.position.set(-1.9,0,4.2); scene.add(g);
+  const metal = M(0x9aa0a6,0.4,0.7);
+  [-0.8,0.8].forEach(x=> box(0.05,2.0,0.4, metal, x,1.0,0, g));
+  [0.35,0.85,1.35,1.85].forEach(y=> box(1.65,0.04,0.4, metal, 0,y,0, g));
+  const jarCols = [0x5f7a5a, 0xa8843c, 0xd8d3c4, 0x6c7f89, 0x8a5a4a, 0x4a6b66];
+  let seed = 1; const rnd = ()=> (seed = (seed*9301+49297)%233280)/233280;
+  [0.35,0.85,1.35,1.85].forEach((y)=>{
+    let x = -0.68;
+    while(x < 0.6){
+      const r = rnd();
+      if(r < 0.55){ const h=0.14+rnd()*0.12;
+        cyl(0.045,0.045,h, M(jarCols[Math.floor(rnd()*6)],0.55), x,y+0.02+h/2,0, g);
+        box(0.08,0.03,0.08, M(0xd8d3c4,0.6), x,y+0.05+h,0, g);
+      } else { const w=0.12+rnd()*0.1;
+        box(w,0.16+rnd()*0.08,0.14, M(jarCols[Math.floor(rnd()*6)],0.7), x+ w/2, y+0.02+0.1,0, g);
+        x += w;
+      }
+      x += 0.13;
+    }
+  });
+  addCollider(-1.9,4.2,1.8,0.6);
+  registerInteract(g, 'Botiquín de fármacos', 'CASO 04 — clic o E para revisar el botiquín de Nube', ()=>openCase('nube'));
+}
+
+function buildKennel(){
+  const g = new THREE.Group(); g.position.set(1.3,0,4.2); scene.add(g);
+  const metal = M(0x7d8288,0.4,0.7);
+  box(1.4,1.9,0.5, metal, 0,0.95,-0.1, g);
+  box(1.45,0.06,0.55, metal, 0,0.02,0, g);
+  box(1.45,0.05,0.55, metal, 0,0.98,0, g);
+  const bars = new THREE.Group(); bars.position.set(0,0,0.16); g.add(bars);
+  for(let i=0;i<11;i++) cyl(0.008,0.008,1.8, metal, -0.6+i*0.12,0.95,0, bars, 8);
+  cyl(0.008,0.008,1.25, metal, 0,1.55,0, bars, 8).rotation.z = Math.PI/2;
+  cyl(0.008,0.008,1.25, metal, 0,0.55,0, bars, 8).rotation.z = Math.PI/2;
+  const cat = new THREE.Group(); cat.position.set(0.15,1.03,-0.08); g.add(cat);
+  const cb = cyl(0.09,0.1,0.3, M(0xd8d3c4,0.95), 0,0.1,0, cat); cb.rotation.x = Math.PI/2;
+  box(0.16,0.06,0.12, M(0xa8843c,0.95), 0,0.16,-0.06, cat);
+  catHead = new THREE.Mesh(new THREE.SphereGeometry(0.085,14,12), M(0xd8d3c4,0.95)); catHead.position.set(0,0.18,-0.18); catHead.castShadow=true; cat.add(catHead);
+  [[-0.05],[0.05]].forEach(([x])=>{ cyl(0.001,0.035,0.07, M(0xa8843c,0.95), x,0.27,-0.17, cat); });
+  [[-0.032],[0.032]].forEach(([x])=>{ const eye=new THREE.Mesh(new THREE.SphereGeometry(0.013,8,8), new THREE.MeshStandardMaterial({color:0x9fdc6a,emissive:0x86c94e,emissiveIntensity:1.6})); eye.position.set(x,0.19,-0.25); cat.add(eye); catEyes.push(eye); });
+  const ct = cyl(0.012,0.02,0.24, M(0xa8843c,0.95), -0.16,0.14,0.16, cat); ct.rotation.z = 1.1;
+  addCollider(1.3,4.2,1.6,0.7);
+  registerInteract(g, 'Jaulero de hospitalización', 'clic o E para saludar al paciente felino', ()=>{
+    SFX.pick();
+    toast('«Miau.» Una gata tricolor te observa desde la jaula de arriba. Su placa dice: <b>INGRESADA — OBSERVACIÓN 24 h</b>.', 'cat');
+  });
+}
+
+function buildBoard(){
+  const t = canvasTex(1024,640,(x,w,h)=>{
+    x.fillStyle='#f2efe6'; x.fillRect(0,0,w,h);
+    x.strokeStyle='#20281f'; x.fillStyle='#20281f'; x.lineWidth=5; x.lineCap='round';
+    x.font='700 44px "Space Grotesk", sans-serif';
+    x.fillText('TURNO DE NOCHE', 60, 90);
+    x.beginPath(); x.moveTo(60,112); x.lineTo(430,112); x.strokeStyle='#c26a1f'; x.stroke();
+    x.strokeStyle='#20281f'; x.font='30px "IBM Plex Mono", monospace';
+    const lines = ['□ 5 expedientes pendientes','□ código de salida = 5 dígitos','','brecha aniónica = Na − (Cl + HCO₃)','Na : K < 27  →  ¿Addison?','esferocitos: pequeños, sin pale. central'];
+    lines.forEach((l,i)=> x.fillText(l, 60, 190+i*58));
+    x.strokeStyle='#20281f'; x.lineWidth=4;
+    x.beginPath(); x.ellipse(790, 300, 95, 120, -0.25, 0, 7); x.stroke();
+    x.beginPath(); x.moveTo(790,240); x.quadraticCurveTo(860,150,905,190); x.stroke();
+    x.font='24px "IBM Plex Mono", monospace'; x.fillText('derrame?', 730, 470);
+    x.strokeStyle='#c26a1f'; x.beginPath(); x.moveTo(745,480); x.lineTo(880,480); x.stroke();
+    x.strokeStyle='#a5432f'; x.lineWidth=6;
+    x.beginPath(); x.moveTo(520,540); x.quadraticCurveTo(760,500, 960,545); x.stroke();
+  });
+  redraws.push(t.redraw);
+  const g = new THREE.Group(); g.position.set(-5.88,1.75,2.6); g.rotation.y = Math.PI/2; scene.add(g);
+  const b = new THREE.Mesh(new THREE.PlaneGeometry(2.1,1.3), new THREE.MeshStandardMaterial({map:t.tex, roughness:0.9}));
+  b.position.z = 0.012; g.add(b);
+  box(2.2,1.4,0.05, M(0x8a6a45,0.7), 0,0,-0.01, g);
+  registerInteract(g, 'Pizarra de la consulta', 'clic o E para leer tus apuntes', ()=>{
+    SFX.pick();
+    toast('Tus apuntes de la semana: <b>el código de salida son los 5 dígitos de los expedientes</b>. Y recuerda: brecha aniónica = Na − (Cl + HCO₃).','sticky-note', 5200);
+  });
+}
+
+function buildFile(){
+  const g = new THREE.Group(); g.position.set(5.45,0,-2.7); scene.add(g);
+  const wood = M(0x84674a,0.7);
+  box(0.55,1.5,1.25, wood, 0,0.75,0, g);
+  for(let i=0;i<4;i++){
+    box(0.02,0.3,1.1, M(0x6e5539,0.7), -0.285,0.3+i*0.34,0, g);
+    cyl(0.012,0.012,0.16, M(0xb9bec4,0.35,0.8), -0.3,0.3+i*0.34,0, g,10).rotation.z = Math.PI/2;
+  }
+  box(0.6,0.04,1.3, M(0x6e5539,0.7), 0,1.52,0, g);
+  addCollider(5.45,-2.7,0.8,1.5);
+  registerInteract(g, 'Archivo de historiales', 'clic o E para rebuscar en los papeles', ()=>{
+    const c = CASES.find(cs=>!state.resolved.has(cs.id));
+    if(c && !state.freeHints.has(c.id)){
+      state.freeHints.add(c.id); SFX.hint();
+      toast(`<b>Entre los papeles</b> encuentras una nota sobre ${c.pet}: ${c.hints[0]}`,'file-text', 7000);
+    } else {
+      SFX.pick();
+      toast('Rebuscas entre los historiales… ya no queda nada que no sepas. Las pistas de pago están dentro de cada expediente.','file-text');
+    }
+  });
+}
+
+function buildDoor(){
+  const frameM = M(0x6e5539,0.65);
+  box(0.1,2.3,0.16, frameM, -2.25,1.15,-ROOM.D/2);
+  box(0.1,2.3,0.16, frameM, -1.05,1.15,-ROOM.D/2);
+  box(1.3,0.12,0.16, frameM, -1.65,2.32,-ROOM.D/2);
+  doorGroup = new THREE.Group(); doorGroup.position.set(-2.18,0,-ROOM.D/2); scene.add(doorGroup);
+  box(1.06,2.24,0.07, M(0x7d6142,0.6), 0.53,1.12,0, doorGroup);
+  box(0.08,0.7,0.02, M(0x6e5539,0.6), 0.53,1.5,-0.045, doorGroup);
+  const knob = new THREE.Mesh(new THREE.SphereGeometry(0.045,14,12), M(0xb9bec4,0.3,0.85));
+  knob.position.set(0.95,1.1,0.06); knob.castShadow = true; doorGroup.add(knob);
+  const pt = canvasTex(512,256,(x,w,h)=>{
+    x.fillStyle='#e9e2cd'; x.fillRect(0,0,w,h);
+    x.strokeStyle='#20281f'; x.lineWidth=6; x.strokeRect(12,12,w-24,h-24);
+    x.fillStyle='#20281f'; x.textAlign='center';
+    x.font='700 56px "Fraunces", serif'; x.fillText('CONSULTA 3', w/2, 108);
+    x.font='500 30px "IBM Plex Mono", monospace'; x.fillText('MEDICINA INTERNA', w/2, 168);
+  });
+  redraws.push(pt.redraw);
+  const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.72,0.36), new THREE.MeshStandardMaterial({map:pt.tex, roughness:0.8}));
+  plate.position.set(-0.62,2.0,-ROOM.D/2+0.075); scene.add(plate);
+  const kt = canvasTex(360,480,(x,w,h)=>{
+    x.fillStyle='#23261f'; x.fillRect(0,0,w,h);
+    x.fillStyle='#0b1512'; x.fillRect(30,26,w-60,74);
+    x.strokeStyle='#2c3b38'; x.lineWidth=3; x.strokeRect(30,26,w-60,74);
+    x.fillStyle='#59c2d0'; x.font='600 40px monospace'; x.textAlign='center';
+    x.fillText('– – – – –', w/2, 80);
+    x.fillStyle='#c26a1f'; x.font='600 17px monospace'; x.fillText('S A L I D A', w/2, 132);
+    const keys=['1','2','3','4','5','6','7','8','9','C','0','OK'];
+    for(let i=0;i<12;i++){
+      const kx = 30 + (i%3)*102, ky = 158 + Math.floor(i/3)*76;
+      x.fillStyle = keys[i]==='OK' ? '#4b5f3a' : '#2f342a';
+      rr(x, kx,ky,90,64,10); x.fill();
+      x.fillStyle='#e6e1cb'; x.font='600 30px monospace';
+      x.fillText(keys[i], kx+45, ky+42);
+    }
+  });
+  redraws.push(kt.redraw);
+  const kp = new THREE.Mesh(new THREE.PlaneGeometry(0.34,0.45), new THREE.MeshStandardMaterial({map:kt.tex, emissive:0xffffff, emissiveMap:kt.tex, emissiveIntensity:0.55, roughness:0.6}));
+  kp.position.set(-0.62,1.35,-ROOM.D/2+0.075); scene.add(kp);
+  registerInteract(kp, 'Teclado de salida', 'clic o E para introducir el código', openKeypad);
+  registerInteract(doorGroup, 'Puerta de salida', 'bloqueada — necesitas el código de 5 dígitos', openKeypad);
+}
+
+function buildProps(){
+  const g = new THREE.Group(); g.position.set(1.2,2.35,-ROOM.D/2+0.06); scene.add(g);
+  const face = new THREE.Mesh(new THREE.CircleGeometry(0.28,40), M(0xf0ecdd,0.8)); face.position.z=0.015; g.add(face);
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(0.28,0.025,10,40), M(0x2c2f2b,0.5)); g.add(rim);
+  const mkHand = (l,wd)=>{ const hnd = box(wd,l,0.006, M(0x20281f,0.5), 0,0.02+l/2,0.03, g); return hnd; };
+  const hh = mkHand(0.14,0.02); hh.rotation.z = 0.3;
+  const mh = mkHand(0.2,0.014); mh.rotation.z = -1.9;
+  clockHand = mkHand(0.22,0.008); clockHand.material = M(0xa5432f,0.5);
+  cyl(0.015,0.015,0.02, M(0xa5432f,0.5), 0,0,0.035, g, 12).rotation.x = Math.PI/2;
+  const rug = new THREE.Mesh(new THREE.CircleGeometry(1.15,40), M(0x6e5539,0.95));
+  rug.rotation.x = -Math.PI/2; rug.position.set(0.2,0.012,0.9); rug.receiveShadow = true; scene.add(rug);
+  const pg = new THREE.Group(); pg.position.set(-5.45,0,4.0); scene.add(pg);
+  cyl(0.16,0.12,0.3, M(0xa8843c,0.8), 0,0.15,0, pg);
+  for(let i=0;i<7;i++){
+    const leaf = cyl(0.001,0.05,0.5+Math.random()*0.25, M(0x4a6b4a,0.9), (Math.random()-0.5)*0.15,0.55,(Math.random()-0.5)*0.15, pg, 6);
+    leaf.rotation.z = (Math.random()-0.5)*0.8; leaf.rotation.x = (Math.random()-0.5)*0.8;
+  }
+  addCollider(-5.45,4.0,0.5,0.5);
+  const st = new THREE.Group(); st.position.set(-2.5,0,0.6); scene.add(st);
+  cyl(0.18,0.18,0.05, M(0x2f5d5a,0.7), 0,0.52,0, st);
+  cyl(0.02,0.03,0.5, M(0xb9bec4,0.4,0.7), 0,0.26,0, st);
+  cyl(0.14,0.14,0.02, M(0xb9bec4,0.4,0.7), 0,0.02,0, st);
+  addCollider(-2.5,0.6,0.45,0.45);
+}
+
+/* ================================================================
+   5. CONTROLES — Pointer Events unificados (ratón + táctil)
+================================================================ */
+const keys = new Set();
+let moveVec = {x:0, y:0};
+addEventListener('keydown', e=>{
+  const k = (e.key || '').toLowerCase();
+  keys.add(k);
+  if((e.code === 'KeyE' || k === 'e') && !e.repeat && state.started && !state.uiOpen && !state.won) tryInteract();
+  if((e.code === 'KeyN' || k === 'n') && !e.repeat && state.started && !state.won) toggleNotes();
+  if(k === 'escape') closeAllPanels();
+});
+addEventListener('keyup', e=> keys.delete((e.key || '').toLowerCase()));
+
+function collide(x,z){
+  const r = 0.32;
+  if(x < -5.68+r || x > 5.68-r || z < -4.18+r || z > 4.18-r) return true;
+  for(const c of colliders)
+    if(x+r > c.x1 && x-r < c.x2 && z+r > c.z1 && z-r < c.z2) return true;
+  return false;
+}
+function tickMove(dt){
+  if(!state.started || state.uiOpen || state.won || state.winning) return;
+  let f = (keys.has('w')||keys.has('arrowup')?1:0) - (keys.has('s')||keys.has('arrowdown')?1:0);
+  let s = (keys.has('d')||keys.has('arrowright')?1:0) - (keys.has('a')||keys.has('arrowleft')?1:0);
+  f += -moveVec.y; s += moveVec.x;
+  const len = Math.hypot(f,s);
+  if(len < 0.01) return;
+  if(len > 1){ f/=len; s/=len; }
+  const sp = (keys.has('shift') ? 4.6 : 3.0) * dt;
+  const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
+  const rx = Math.cos(yaw), rz = -Math.sin(yaw);
+  const dx = (f*fx + s*rx) * sp, dz = (f*fz + s*rz) * sp;
+  if(!collide(camera.position.x+dx, camera.position.z)) camera.position.x += dx;
+  if(!collide(camera.position.x, camera.position.z+dz)) camera.position.z += dz;
+}
+
+/* ---- Interacción: un clic corto SIEMPRE examina, con o sin puntero bloqueado ---- */
+let hoverIt = null;
+function tryInteract(){
+  let it = hoverIt;
+  if(!it){
+    // raycast fresco por el centro en el momento del clic
+    try{
+      raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
+      const hits = raycaster.intersectObjects(interactMeshes, false);
+      for(const h of hits){ if(h.distance <= 3.4){ it = h.object.userData.it; break; } }
+    }catch(e){}
+  }
+  if(!it) return;
+  try{ it.action(); }
+  catch(err){ reportErr(err, 'al examinar el objeto'); }
+}
+
+let pDown = null;
+canvas.addEventListener('pointerdown', e=>{
+  if(!state.started || state.uiOpen || state.won || state.winning) return;
+  if(e.pointerType === 'mouse' && document.pointerLockElement !== canvas) lockPointer();
+  pDown = {id:e.pointerId, x:e.clientX, y:e.clientY, moved:0};
+  try{ canvas.setPointerCapture(e.pointerId); }catch(err){}
+});
+canvas.addEventListener('pointermove', e=>{
+  if(document.pointerLockElement === canvas){
+    yaw -= (e.movementX || 0) * 0.0023;
+    pitch = Math.max(-1.35, Math.min(1.35, pitch - (e.movementY || 0) * 0.0023));
+  } else if(pDown && e.pointerId === pDown.id){
+    const dx = e.clientX - pDown.x, dy = e.clientY - pDown.y;
+    pDown.moved += Math.abs(dx) + Math.abs(dy);
+    if(pDown.moved > 6){
+      yaw -= dx * 0.004;
+      pitch = Math.max(-1.35, Math.min(1.35, pitch - dy * 0.004));
+    }
+    pDown.x = e.clientX; pDown.y = e.clientY;
+  }
+});
+canvas.addEventListener('pointerup', e=>{
+  if(pDown && e.pointerId === pDown.id){
+    if(pDown.moved <= 8 && state.started && !state.uiOpen && !state.won && !state.winning) tryInteract();
+    pDown = null;
+  }
+});
+canvas.addEventListener('pointercancel', ()=>{ pDown = null; });
+
+/* joystick táctil */
+const stick = $('#stick'), knob = $('#stickKnob');
+stick.addEventListener('touchstart', e=>e.stopPropagation(), {passive:true});
+stick.addEventListener('touchmove', e=>{
+  e.preventDefault(); const r = stick.getBoundingClientRect();
+  const t = e.touches[0];
+  let vx = (t.clientX - (r.left+r.width/2)) / (r.width/2);
+  let vy = (t.clientY - (r.top+r.height/2)) / (r.height/2);
+  const l = Math.hypot(vx,vy); if(l>1){ vx/=l; vy/=l; }
+  moveVec = {x:vx, y:vy};
+  knob.style.transform = `translate(${vx*32}px, ${vy*32}px)`;
+}, {passive:false});
+stick.addEventListener('touchend', ()=>{ moveVec = {x:0,y:0}; knob.style.transform = ''; });
+ $('#btnAct').addEventListener('click', ()=>{ if(state.started && !state.uiOpen && !state.won) tryInteract(); });
+
+const raycaster = new THREE.Raycaster();
+function tickLook(){
+  const label = $('#lookLabel'), cross = $('#cross'), act = $('#btnAct');
+  if(!state.started || state.uiOpen || state.won || state.winning){
+    label.classList.remove('on'); cross.classList.remove('active'); act.classList.remove('show'); return;
+  }
+  try{
+    raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
+    const hits = raycaster.intersectObjects(interactMeshes, false);
+    let found = null;
+    for(const h of hits){ if(h.distance <= 3.4){ found = h.object.userData.it; break; } }
+    if(found !== hoverIt){
+      if(hoverIt) hoverIt.mats.forEach(m=>{ m.emissive.setHex(m.userData.base || 0x000000); });
+      hoverIt = found;
+      if(hoverIt){
+        hoverIt.mats.forEach(m=>{ m.emissive.setHex(0x2b1f0e); });
+        $('#lookName').textContent = hoverIt.name;
+        $('#lookSub').textContent = hoverIt.sub;
+        label.classList.add('on'); SFX.pick();
+      } else label.classList.remove('on');
+      cross.classList.toggle('active', !!hoverIt);
+      if(IS_TOUCH) act.classList.toggle('show', !!hoverIt);
+    }
+  }catch(e){ /* silencioso: no interrumpe el bucle */ }
+}
+
+/* ================================================================
+   6. UI — EXPEDIENTES, PISTAS, MICROSCOPIO, KEYPAD
+================================================================ */
+const panelCase = $('#panelCase'), panelKeypad = $('#panelKeypad'), panelNotes = $('#panelNotes'), sheet = $('#sheet');
+function openOverlay(el){ el.classList.remove('gone'); state.uiOpen = true; document.exitPointerLock && document.exitPointerLock(); }
+function closeOverlay(el){ el.classList.add('gone'); state.uiOpen = document.querySelector('.overlay:not(.gone)') != null; }
+function closeAllPanels(){
+  let any = false;
+  [panelCase, panelKeypad, panelNotes].forEach(p=>{ if(!p.classList.contains('gone')){ p.classList.add('gone'); any = true; } });
+  if(any) state.uiOpen = false;
+}
+function closeCaseSheet(){
+  closeOverlay(panelCase); renderNotesIfOpen();
+  if(!IS_TOUCH) setTimeout(lockPointer, 50);
+}
+
+function openCase(id){
+  const c = CASES.find(x=>x.id===id);
+  if(!c){ toast('Expediente no encontrado.', 'alert-triangle'); return; }
+  window.activeCase = c;
+  if(c.step == null || c.step < 0) c.step = 0;
+  SFX.pick();
+  openOverlay(panelCase);                 // el panel SIEMPRE abre
+  try{ renderSheet(); }
+  catch(err){
+    reportErr(err, 'expediente');
+    sheet.innerHTML = `<div class="sheet-body">
+      <div class="sec-label">ERROR</div>
+      <p class="anamnesis">No se pudo cargar el contenido (${esc(err.message)}). Cierra y vuelve a intentarlo.</p>
+      <div class="nextrow"><button class="btn-sm js-close">Cerrar</button></div></div>`;
+    sheet.querySelectorAll('.js-close').forEach(b=> b.onclick = closeCaseSheet);
+  }
+}
+function labTable(c){
+  return `<table class="lab">${c.lab.map(r=>
+    `<tr class="${r[3]==='hi'?'flag-hi':r[3]==='lo'?'flag-lo':''}"><td>${r[0]}</td><td class="v">${r[1]}</td><td class="r">${r[2]}</td></tr>`).join('')}</table>`;
+}
+function renderSheet(){
+  const c = window.activeCase;
+  const solvedCount = state.resolved.size;
+  sheet.innerHTML = `
+    <div class="sheet-head">
+      <div>
+        <div class="sheet-kicker">EXPEDIENTE ${c.num} · ${c.station} · RESUELTOS ${solvedCount}/5</div>
+        <h2>${c.pet}</h2>
+        <div class="sheet-pet">${c.meta} — ${c.title}</div>
+      </div>
+      <div class="head-tools">
+        <button class="tbtn" id="btnHint"><i data-lucide="lightbulb"></i>Pista · ${state.hintsLeft}</button>
+        <button class="tbtn js-close"><i data-lucide="x"></i></button>
+      </div>
+    </div>
+    <div class="sheet-body">
+      <div class="sec-label">ANAMNESIS</div>
+      <p class="anamnesis">${c.anamnesis}</p>
+      <div class="sec-label">PRUEBAS DE LABORATORIO</div>
+      ${labTable(c)}
+      <div class="sec-label">${c.done ? 'CONCLUSIÓN' : 'RAZONAMIENTO CLÍNICO'}</div>
+      <div id="stepzone"></div>
+      <div id="hintzone"></div>
+    </div>`;
+  refreshIcons();
+  sheet.querySelectorAll('.js-close').forEach(b=> b.onclick = closeCaseSheet);
+  $('#btnHint').onclick = useHint;
+  const sz = $('#stepzone');
+  if(c.done) sz.innerHTML = doneHTML(c, true);
+  else {
+    const i = Math.min(c.step || 0, c.steps.length - 1);
+    renderStep(sz, c.steps[i], i, c.steps.length);
+  }
+}
+function renderStep(zone, st, idx, total){
+  const tag = `<span class="qtag">PREGUNTA ${idx+1} / ${total}</span>`;
+  if(st.t === 'choice'){
+    zone.innerHTML = `${tag}<div class="qtext">${st.q}</div>
+      <div class="opts">${st.opts.map((o,i)=>`<button class="opt" data-i="${i}"><b>${String.fromCharCode(65+i)}</b><span>${o}</span></button>`).join('')}</div>
+      <div id="fb"></div>`;
+    zone.querySelectorAll('.opt').forEach(btn=>{
+      btn.onclick = ()=>{
+        if(+btn.dataset.i === st.correct){
+          SFX.ok();
+          zone.querySelectorAll('.opt').forEach(b=>b.style.pointerEvents='none');
+          btn.classList.add('ok');
+          $('#fb').innerHTML = `<div class="why"><span class="whytag">POR QUÉ</span>${st.why}</div>
+            <div class="nextrow"><button class="btn-sm" id="btnNext">${idx+1===total ? 'Recoger el dígito' : 'Continuar'} →</button></div>`;
+          $('#btnNext').onclick = ()=> advance();
+        } else {
+          state.mistakes++; SFX.bad();
+          btn.classList.add('bad');
+        }
+      };
+    });
+  } else if(st.t === 'input'){
+    zone.innerHTML = `${tag}<div class="qtext">${st.q}</div>
+      <div class="inprow"><input id="numIn" type="text" inputmode="decimal" placeholder="?" autocomplete="off">${st.unit?`<span class="unit">${st.unit}</span>`:''}
+      <button class="btn-sm" id="btnCheck">Comprobar</button></div><div id="fb"></div>`;
+    const inp = $('#numIn'); inp.focus();
+    const check = ()=>{
+      const v = parseFloat(inp.value.replace(',', '.'));
+      if(isNaN(v)){ $('#fb').innerHTML = `<div class="fbad">Introduce un número.</div>`; return; }
+      if(Math.abs(v - st.ans) <= st.tol){
+        SFX.ok(); inp.disabled = true; $('#btnCheck').disabled = true;
+        $('#fb').innerHTML = `<div class="fok">✓ Correcto.</div><div class="why"><span class="whytag">POR QUÉ</span>${st.why}</div>
+          <div class="nextrow"><button class="btn-sm" id="btnNext">${idx+1===total ? 'Recoger el dígito' : 'Continuar'} →</button></div>`;
+        $('#btnNext').onclick = ()=> advance();
+      } else {
+        state.mistakes++; SFX.bad();
+        $('#fb').innerHTML = `<div class="fbad">No cuadra. Revisa los valores del panel y vuelve a calcular.</div>`;
+        inp.select();
+      }
+    };
+    $('#btnCheck').onclick = check;
+    inp.addEventListener('keydown', e=>{ if(e.key==='Enter') check(); });
+  } else if(st.t === 'micro'){
+    zone.innerHTML = `${tag}<div class="qtext">${st.q}</div>
+      <div class="micro-wrap"><canvas id="microC" class="micro-canvas" width="520" height="520"></canvas>
+      <div class="micro-status" id="microSt">Encontrados <b>0</b> / ${st.need} · errores 0</div></div><div id="fb"></div>`;
+    runMicro(zone, st);
+  }
+}
+function advance(){
+  const c = window.activeCase;
+  c.step = (c.step || 0) + 1;
+  if(c.step >= c.steps.length){
+    c.done = true; state.resolved.add(c.id);
+    SFX.win();
+    sheet.innerHTML = `<div class="sheet-head">
+        <div><div class="sheet-kicker">EXPEDIENTE ${c.num} · ${c.station}</div><h2>${c.pet}</h2>
+        <div class="sheet-pet">${c.meta} — ${c.title}</div></div>
+        <div class="head-tools"><button class="tbtn js-close"><i data-lucide="x"></i></button></div></div>
+      <div class="sheet-body">${doneHTML(c, false)}</div>`;
+    refreshIcons();
+    sheet.querySelectorAll('.js-close').forEach(b=> b.onclick = ()=>{
+      closeCaseSheet();
+      if(state.resolved.size === 5) toast('Ya tienes los <b>cinco dígitos</b>. El teclado de la puerta te espera.', 'door-open', 6000);
+    });
+    updateHUD();
+  } else renderSheet();
+}
+function doneHTML(c, again){
+  return `<div class="solved">
+    <div class="stamp">RESUELTO</div>
+    ${again ? '' : `<div class="digitbox"><div class="digitlbl">DÍGITO DEL CÓDIGO DE SALIDA</div><div class="digit">${c.digit}</div></div>`}
+    ${again ? `<p style="margin-top:14px;font-size:14px;color:var(--ink2)">Dígito ya anotado en tu cuaderno: <b style="font-family:Fraunces,serif;font-size:20px;color:var(--accent)">${c.digit}</b></p>` : ''}
+    <div class="pearl">${c.pearl}</div>
+    <button class="btn-sm js-close">Cerrar expediente</button>
+  </div>`;
+}
+function useHint(){
+  const c = window.activeCase;
+  if(c.done){ toast('Este expediente ya está resuelto.'); return; }
+  const used = c.hintsUsed || 0;
+  if(used >= c.hints.length){ toast('No quedan más pistas para este caso. Aplica el método.','lightbulb'); return; }
+  if(state.hintsLeft <= 0){ toast('Te has quedado sin pistas. La consulta también se aprende a base de errores.','lightbulb'); return; }
+  c.hintsUsed = used + 1; state.hintsLeft--;
+  SFX.hint(); updateHUD();
+  $('#hintzone').innerHTML = `<div class="hintpaper">${c.hints[used]}</div>`;
+  $('#btnHint').innerHTML = `<i data-lucide="lightbulb"></i>Pista · ${state.hintsLeft}`;
+  refreshIcons();
+}
+
+function runMicro(zone, st){
+  const cv = zone.querySelector('#microC'), ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height, CX = W/2, CY = H/2, R = W/2 - 8;
+  const cells = [];
+  const place = (sph)=>{
+    for(let t=0;t<600;t++){
+      const a = Math.random()*Math.PI*2, d = Math.sqrt(Math.random()) * (R-30);
+      const x = CX + Math.cos(a)*d, y = CY + Math.sin(a)*d;
+      const r = sph ? 9 + Math.random()*3 : 13 + Math.random()*3.5;
+      if(cells.every(c=> Math.hypot(c.x-x, c.y-y) > c.r + r + 3)){ cells.push({x,y,r,sph,found:false}); return; }
+    }
+  };
+  for(let i=0;i<st.need+1;i++) place(true);
+  let guard = 0;
+  while(cells.length < 36 && guard++ < 500) place(false);
+  cells.sort(()=>Math.random()-0.5);
+  let found = 0, miss = 0;
+  const draw = ()=>{
+    ctx.clearRect(0,0,W,H);
+    ctx.save();
+    ctx.beginPath(); ctx.arc(CX,CY,R,0,7); ctx.clip();
+    const bg = ctx.createRadialGradient(CX,CY,R*0.3,CX,CY,R);
+    bg.addColorStop(0,'#3a1218'); bg.addColorStop(1,'#200a0e');
+    ctx.fillStyle = bg; ctx.fillRect(0,0,W,H);
+    for(const c of cells){
+      ctx.beginPath(); ctx.arc(c.x,c.y,c.r,0,7);
+      if(c.sph){ ctx.fillStyle = '#8f2733'; ctx.fill(); ctx.strokeStyle = 'rgba(60,10,18,.8)'; ctx.lineWidth=2; ctx.stroke(); }
+      else { ctx.fillStyle = '#a83a44'; ctx.fill();
+        ctx.beginPath(); ctx.arc(c.x,c.y,c.r*0.45,0,7); ctx.fillStyle = '#c4626a'; ctx.fill(); }
+      if(c.found){ ctx.beginPath(); ctx.arc(c.x,c.y,c.r+5,0,7); ctx.strokeStyle='#3f7d54'; ctx.lineWidth=3.5; ctx.stroke(); }
+    }
+    ctx.restore();
+    ctx.beginPath(); ctx.arc(CX,CY,R,0,7); ctx.strokeStyle='#3a3f33'; ctx.lineWidth=2; ctx.stroke();
+  };
+  draw();
+  const scale = ()=> cv.getBoundingClientRect().width / W;
+  cv.addEventListener('click', e=>{
+    if(found >= st.need) return;
+    const rect = cv.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / scale(), y = (e.clientY - rect.top) / scale();
+    const hitC = cells.find(c=> Math.hypot(c.x-x, c.y-y) < c.r + 6);
+    if(hitC && hitC.sph && !hitC.found){
+      hitC.found = true; found++; SFX.ok();
+    } else { miss++; SFX.bad(); }
+    zone.querySelector('#microSt').innerHTML = `Encontrados <b>${found}</b> / ${st.need} · errores ${miss}`;
+    draw();
+    if(found === st.need){
+      zone.querySelector('#fb').innerHTML = `<div class="fok">✓ Los ${st.need} esferocitos identificados.</div>
+        <div class="nextrow"><button class="btn-sm" id="btnNext">Continuar →</button></div>`;
+      $('#btnNext').onclick = ()=> advance();
+    }
+  });
+}
+
+let kpBuf = [];
+function openKeypad(){
+  kpBuf = []; renderKp();
+  openOverlay(panelKeypad);
+}
+function renderKp(){
+  $('#kpDisplay').textContent = (kpBuf.join('') + '–––––').slice(0,5).split('').join(' ');
+  const known = CASES.filter(c=>state.resolved.has(c.id)).map(c=>c.digit);
+  $('#kpHint').textContent = known.length ? `Dígitos recuperados: ${known.join(' · ')}` : 'Aún no has recuperado ningún dígito';
+}
+['1','2','3','4','5','6','7','8','9','C','0','OK'].forEach(k=>{
+  const b = document.createElement('button');
+  b.textContent = k;
+  b.onclick = ()=>{
+    SFX.key();
+    if(k==='C') kpBuf.pop();
+    else if(k==='OK'){
+      if(kpBuf.join('') === CODE){ closeOverlay(panelKeypad); startWin(); return; }
+      state.mistakes++; SFX.bad();
+      const d = $('#kpDisplay'); d.classList.add('bad');
+      setTimeout(()=>d.classList.remove('bad'), 450);
+    }
+    else if(kpBuf.length < 5) kpBuf.push(k);
+    renderKp();
+  };
+  $('#kpGrid').appendChild(b);
+});
+ $('#kpClose').onclick = ()=>{ closeOverlay(panelKeypad); if(!IS_TOUCH) setTimeout(lockPointer, 50); };
+
+function toggleNotes(){
+  if(panelNotes.classList.contains('gone')){ renderNotes(); openOverlay(panelNotes); }
+  else closeOverlay(panelNotes);
+}
+function renderNotesIfOpen(){ if(!panelNotes.classList.contains('gone')) renderNotes(); }
+function renderNotes(){
+  $('#notesBody').innerHTML = `
+    <button class="tbtn" id="notesClose" style="position:absolute;top:14px;right:14px"><i data-lucide="x"></i></button>
+    <h3>Cuaderno de guardia</h3>
+    <div class="sub">EXPEDIENTES Y CÓDIGO DE SALIDA</div>
+    ${CASES.map(c=>{
+      const ok = state.resolved.has(c.id);
+      return `<div class="noterow"><span class="num">${c.num}</span><span><b>${c.pet}</b> — ${c.title}</span>
+        ${ok?`<span class="dg">${c.digit}</span>`:''}<span class="st ${ok?'done':'pend'}">${ok?'RESUELTO':'PENDIENTE'}</span></div>
+        ${ok?`<p class="notepearl">${c.pearl}</p>`:''}`;
+    }).join('')}
+    <div class="codeline">${CASES.map(c=>state.resolved.has(c.id)?c.digit:'·').join(' ')}</div>`;
+  refreshIcons();
+  $('#notesClose').onclick = ()=>{ closeOverlay(panelNotes); if(!IS_TOUCH) setTimeout(lockPointer, 50); };
+}
+
+function updateHUD(){
+  const dots = $('#dots'); dots.innerHTML = '';
+  CASES.forEach(c=>{
+    const d = document.createElement('div'); d.className = 'dot' + (state.resolved.has(c.id)?' on':'');
+    if(state.resolved.has(c.id)) d.textContent = c.digit;
+    dots.appendChild(d);
+  });
+  $('#hudHints').textContent = state.hintsLeft;
+}
+ $('#btnHintTop').onclick = ()=> toast('Las pistas se piden <b>dentro de cada expediente</b> (botón «Pista»). Te quedan '+state.hintsLeft+'.','lightbulb');
+ $('#btnNotes').onclick = ()=>{ if(!state.won) toggleNotes(); };
+ $('#btnMute').onclick = ()=>{ SFX.muted = !SFX.muted;
+  $('#btnMute').innerHTML = `<i data-lucide="${SFX.muted?'volume-x':'volume-2'}"></i>`; refreshIcons(); };
+
+function startWin(){
+  state.won = true; state.winning = true; state.winT = 0;
+  state.winStart.copy(camera.position); state.winYawA = yaw;
+  SFX.win();
+  document.exitPointerLock && document.exitPointerLock();
+  $('#hud').classList.add('hidden');
+}
+function tickWin(dt){
+  if(!state.winning) return;
+  state.winT = Math.min(1, state.winT + dt/4.4);
+  const e = 1 - Math.pow(1-state.winT, 3);
+  doorGroup.rotation.y = -1.92 * e;
+  extLight.intensity = 130 * e;
+  const target = new THREE.Vector3(-1.65, 1.6, -3.15);
+  camera.position.lerpVectors(state.winStart, target, e);
+  yaw = state.winYawA + (0 - state.winYawA) * e;
+  pitch *= (1 - e);
+  if(state.winT >= 1){
+    state.winning = false;
+    $('#fade').classList.add('on');
+    setTimeout(showEnd, 1300);
+  }
+}
+function showEnd(){
+  const secs = (performance.now() - state.t0)/1000;
+  $('#endTime').textContent = fmt(secs);
+  $('#endHints').textContent = 6 - state.hintsLeft;
+  $('#endMiss').textContent = state.mistakes;
+  $('#endLearn').innerHTML = CASES.map(c=>`<li><b>${c.pet}</b> — ${c.pearl}</li>`).join('');
+  $('#screenEnd').classList.remove('gone');
+  refreshIcons();
+}
+ $('#btnAgain').onclick = ()=> location.reload();
+
+/* ================================================================
+   7. ARRANQUE Y BUCLE PRINCIPAL
+================================================================ */
+buildRoom(); buildLights(); buildExamTable(); buildRadiology(); buildLabDesk();
+buildMicro(); buildShelf(); buildKennel(); buildBoard(); buildFile(); buildDoor(); buildProps();
+updateHUD(); refreshIcons();
+
+window.__startGame = function(){
+  if(state.started) return;
+  SFX.ensure();
+  $('#screenIntro').classList.add('gone');
+  setTimeout(()=> $('#screenIntro').style.display='none', 600);
+  canvas.classList.add('on');
+  $('#hud').classList.remove('hidden');
+  state.started = true; state.t0 = performance.now();
+  if(!IS_TOUCH) lockPointer();
+  toast('<b>Protocolo de cierre activado.</b> Resuelve los 5 expedientes: cada uno esconde un dígito del código de salida.', 'lock', 7000);
+  setTimeout(()=> toast('Mira un objeto y haz <b>clic</b> (o pulsa <b>E</b>) para examinarlo. Si el ratón se escapa, haz clic de nuevo en la escena.', 'mouse-pointer-click', 8000), 7400);
+};
+window.__engineOK = true;
+window.__engineReady && window.__engineReady();
+
+addEventListener('resize', ()=>{
+  camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+const clock = new THREE.Clock();
+let hudTick = 0;
+function loop(){
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, clock.getDelta());
+  const t = clock.elapsedTime;
+  tickMove(dt); tickLook(); tickWin(dt);
+  if(dogTail) dogTail.rotation.z = Math.sin(t*7)*0.5;
+  if(dogBody) dogBody.scale.setScalar(1 + Math.sin(t*2.4)*0.02);
+  if(catHead) catHead.rotation.y = Math.sin(t*0.6)*0.35;
+  const blink = (t % 3.7) > 3.55 ? 0.1 : 1;
+  catEyes.forEach(e=> e.scale.y = blink);
+  if(clockHand) clockHand.rotation.z = -(t % 60)/60 * Math.PI*2;
+  if(rxScreenMat) rxScreenMat.emissiveIntensity = 0.95 + Math.sin(t*9)*0.035 + Math.sin(t*23)*0.02;
+  if(monitorMat) monitorMat.emissiveIntensity = 0.8 + Math.sin(t*13)*0.03;
+  if(state.started && !state.won){
+    hudTick += dt;
+    if(hudTick > 0.5){ hudTick = 0; $('#hudTime').textContent = fmt((performance.now()-state.t0)/1000); }
+  }
+  camera.rotation.y = yaw; camera.rotation.x = pitch;
+  renderer.render(scene, camera);
+}
+loop();
+
+} catch(err){
+  console.error('Error al inicializar la escena:', err);
+  window.__engineError && window.__engineError('Error al construir la escena 3D: <b>' + esc(err && err.message ? err.message : String(err)) + '</b>. Recarga con Ctrl+F5; si persiste, pásame este mensaje.');
+}
+</script>
+</body>
+</html>

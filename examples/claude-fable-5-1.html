@@ -1,0 +1,1864 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>VetEscape Medicina Interna</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<style>
+  :root {
+    --cyan: #22d3ee; --cyan-2: #06b6d4; --cyan-glow: rgba(34, 211, 238, .35);
+    --green: #34d399; --amber: #fbbf24; --red: #f87171; --violet: #a78bfa;
+    --bg: #070b14; --panel: rgba(10, 16, 30, .88); --panel-2: rgba(17, 25, 44, .92);
+    --line: rgba(125, 211, 252, .18); --text: #e6edf7; --muted: #8fa3bf;
+    --font: 'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --mono: 'JetBrains Mono', 'Courier New', monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); overflow: hidden; }
+  #app { position: fixed; inset: 0; width: 100vw; height: 100vh; overflow: hidden; background: var(--bg); font-size: 15px; }
+  #canvas-container { position: absolute; inset: 0; }
+  #canvas-container canvas { display: block; touch-action: none; }
+  button { font-family: var(--font); }
+  ::selection { background: rgba(34, 211, 238, .35); }
+
+  /* ---------- barra superior ---------- */
+  #hud { position: absolute; inset: 0; pointer-events: none; z-index: 20; display: none; }
+  #hud.on { display: block; }
+  #top-bar { position: absolute; top: 14px; left: 16px; right: 16px; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: 0 10px 40px rgba(0,0,0,.55); pointer-events: auto; }
+  #case-badge { padding: 10px 16px; display: flex; align-items: center; gap: 12px; max-width: 46vw; }
+  #case-badge .sys { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--cyan); font-weight: 700; }
+  #case-badge .ttl { font-size: 15px; font-weight: 700; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #case-badge .pt { font-size: 12px; color: var(--muted); margin-top: 1px; }
+  #right-hud { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+  #timer-panel { padding: 8px 16px; display: flex; align-items: center; gap: 14px; }
+  #timer { font-family: var(--mono); font-size: 30px; font-weight: 700; color: var(--cyan); letter-spacing: .12em; text-shadow: 0 0 14px var(--cyan-glow); line-height: 1; }
+  #timer.low { color: var(--red); text-shadow: 0 0 14px rgba(248,113,113,.5); animation: blink 1s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: .45; } }
+  #score { font-family: var(--mono); font-size: 13px; color: var(--muted); text-align: right; line-height: 1.3; }
+  #score b { color: var(--text); font-size: 16px; }
+  .icon-btn { background: var(--panel-2); border: 1px solid var(--line); color: var(--muted); border-radius: 10px; padding: 7px 12px; font-size: 12px; font-weight: 600; cursor: pointer; transition: .2s; display: inline-flex; align-items: center; gap: 6px; }
+  .icon-btn:hover { color: var(--cyan); border-color: var(--cyan-2); }
+  .icon-btn svg { width: 14px; height: 14px; }
+
+  /* ---------- código / fragmentos ---------- */
+  #code-panel { padding: 8px 14px; display: flex; align-items: center; gap: 10px; }
+  #code-panel .lbl { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+  .frag { width: 34px; height: 40px; border-radius: 8px; background: #050912; border: 1px solid #1f2d47; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: var(--mono); font-size: 20px; font-weight: 700; color: #2b3b58; position: relative; transition: .3s; }
+  .frag small { font-size: 8px; letter-spacing: .06em; color: #3b4d6e; font-family: var(--font); font-weight: 700; margin-top: -2px; }
+  .frag.got { color: var(--cyan); border-color: var(--cyan-2); box-shadow: 0 0 14px var(--cyan-glow), inset 0 0 10px rgba(34,211,238,.15); }
+  .frag.got small { color: var(--cyan-2); }
+  .frag.pop { animation: pop .5s ease; }
+  @keyframes pop { 0% { transform: scale(.6); } 60% { transform: scale(1.2); } 100% { transform: scale(1); } }
+
+  /* ---------- etiquetas 3D ---------- */
+  .st-label { position: absolute; transform: translate(-50%, -100%); pointer-events: auto; cursor: pointer; background: rgba(8, 13, 26, .82); border: 1px solid var(--line); color: var(--text); font-size: 12px; font-weight: 600; padding: 5px 10px 5px 8px; border-radius: 20px; white-space: nowrap; display: flex; align-items: center; gap: 6px; backdrop-filter: blur(6px); transition: opacity .2s, border-color .2s; z-index: 15; }
+  .st-label:hover { border-color: var(--cyan); }
+  .st-label .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--amber); box-shadow: 0 0 8px var(--amber); }
+  .st-label.done .dot { background: var(--green); box-shadow: 0 0 8px var(--green); }
+  .st-label.locked .dot { background: var(--red); box-shadow: 0 0 8px var(--red); }
+  .st-label.done { color: var(--green); }
+  .st-label.hidden { opacity: 0; pointer-events: none; }
+
+  #cue { position: absolute; display: none; transform: translate(-50%, -150%); background: var(--cyan); color: #04121a; font-weight: 700; font-size: 12px; padding: 6px 12px; border-radius: 20px; pointer-events: none; z-index: 30; white-space: nowrap; box-shadow: 0 6px 18px var(--cyan-glow); }
+
+  /* ---------- navegación inferior ---------- */
+  #quick-nav { position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); display: flex; gap: 4px; padding: 6px; border-radius: 40px; max-width: calc(100vw - 24px); overflow-x: auto; }
+  .nav-btn { background: transparent; border: 1px solid transparent; color: var(--muted); padding: 8px 14px; border-radius: 30px; font-size: 12.5px; font-weight: 600; cursor: pointer; transition: .2s; display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+  .nav-btn svg { width: 15px; height: 15px; }
+  .nav-btn:hover, .nav-btn.active { background: rgba(34, 211, 238, .12); color: var(--cyan); border-color: rgba(34, 211, 238, .35); }
+  .nav-btn .chk { display: none; color: var(--green); font-size: 12px; }
+  .nav-btn.done .chk { display: inline; }
+  #hint-msg { position: absolute; bottom: 78px; left: 50%; transform: translateX(-50%); background: rgba(251, 191, 36, .12); border: 1px solid rgba(251, 191, 36, .45); color: #fde68a; padding: 8px 16px; border-radius: 12px; font-size: 13px; max-width: 640px; text-align: center; display: none; pointer-events: auto; }
+
+  /* ---------- toasts ---------- */
+  #toast { position: absolute; top: 90px; left: 50%; transform: translateX(-50%); background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; padding: 10px 18px; font-size: 13.5px; font-weight: 600; opacity: 0; transition: .3s; pointer-events: none; z-index: 60; max-width: 80vw; text-align: center; }
+  #toast.show { opacity: 1; }
+  #toast.ok { border-color: var(--green); color: var(--green); }
+  #toast.bad { border-color: var(--red); color: var(--red); }
+
+  /* ---------- modales ---------- */
+  .modal-bg { position: absolute; inset: 0; background: rgba(3, 6, 12, .55); backdrop-filter: blur(3px); z-index: 90; display: none; pointer-events: auto; }
+  .modal-bg.open { display: flex; align-items: center; justify-content: center; padding: 12px; }
+  .modal { background: linear-gradient(180deg, rgba(14, 21, 38, .97), rgba(8, 13, 26, .98)); border: 1px solid rgba(34, 211, 238, .45); border-radius: 18px; width: 100%; max-width: 760px; max-height: 92vh; display: flex; flex-direction: column; box-shadow: 0 30px 80px rgba(0,0,0,.8), 0 0 50px rgba(34, 211, 238, .12); overflow: hidden; }
+  .modal.wide { max-width: 900px; }
+  .modal-head { display: flex; align-items: center; gap: 12px; padding: 16px 22px; border-bottom: 1px solid var(--line); }
+  .modal-head h2 { margin: 0; font-size: 17px; font-weight: 700; color: var(--cyan); flex: 1; display: flex; align-items: center; gap: 10px; }
+  .modal-head h2 svg { width: 20px; height: 20px; }
+  .modal-head .x { background: transparent; border: 1px solid var(--line); color: var(--muted); width: 32px; height: 32px; border-radius: 8px; cursor: pointer; font-size: 18px; line-height: 1; }
+  .modal-head .x:hover { color: var(--red); border-color: var(--red); }
+  .modal-body { padding: 18px 22px; overflow-y: auto; font-size: 14px; line-height: 1.55; }
+  .modal-body::-webkit-scrollbar { width: 8px; } .modal-body::-webkit-scrollbar-thumb { background: #223354; border-radius: 4px; }
+  .modal.shake { animation: shake .4s; }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-10px)} 40%,80%{transform:translateX(10px)} }
+
+  .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+  .tab { background: #101a2e; border: 1px solid #1f2d47; color: var(--muted); padding: 6px 13px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 12.5px; transition: .15s; }
+  .tab.active { background: var(--cyan-2); color: #041019; border-color: var(--cyan-2); }
+  .tab:hover:not(.active) { border-color: var(--cyan-2); color: var(--cyan); }
+
+  .card { background: rgba(255,255,255,.03); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; }
+  .card.accent { border-left: 3px solid var(--cyan); }
+  h4.sec { margin: 16px 0 8px; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--cyan); font-weight: 800; }
+  .vitals { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+  .vital { background: #0b1324; border: 1px solid #1a2740; border-radius: 10px; padding: 8px 10px; }
+  .vital .k { font-size: 10px; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; font-weight: 700; }
+  .vital .v { font-family: var(--mono); font-size: 14px; font-weight: 700; margin-top: 2px; }
+  .vital.bad .v { color: var(--red); } .vital.warn .v { color: var(--amber); } .vital.ok .v { color: var(--green); }
+  .regions { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; }
+  .region { background: #0b1324; border: 1px solid #1a2740; border-radius: 10px; padding: 10px 12px; cursor: pointer; transition: .2s; }
+  .region:hover { border-color: var(--cyan-2); }
+  .region .rk { font-weight: 700; font-size: 13px; display: flex; justify-content: space-between; align-items: center; }
+  .region .rk span.tag { font-size: 10px; color: var(--cyan); font-weight: 700; letter-spacing: .08em; }
+  .region .rv { font-size: 13px; color: #c7d3e6; margin-top: 6px; display: none; line-height: 1.5; }
+  .region.open .rv { display: block; } .region.open { border-color: rgba(34,211,238,.4); }
+  .region.open .rk span.tag { display: none; }
+
+  table.lab { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.lab th, table.lab td { padding: 7px 10px; border-bottom: 1px solid rgba(31, 45, 71, .8); text-align: left; vertical-align: top; }
+  table.lab th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+  table.lab td.v { font-family: var(--mono); font-weight: 700; }
+  .f-high { color: var(--red); font-weight: 700; } .f-low { color: #60a5fa; font-weight: 700; } .f-ok { color: var(--green); }
+
+  /* ---------- puzzle ---------- */
+  .puzzle { margin-top: 16px; border: 1px solid rgba(251, 191, 36, .35); background: rgba(251, 191, 36, .05); border-radius: 12px; padding: 14px 16px; }
+  .puzzle.solved { border-color: rgba(52, 211, 153, .45); background: rgba(52, 211, 153, .06); }
+  .puzzle .ph { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .puzzle .ph b { color: var(--amber); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; }
+  .puzzle.solved .ph b { color: var(--green); }
+  .puzzle p.q { margin: 0 0 10px; font-weight: 600; }
+  .opts { display: flex; flex-direction: column; gap: 7px; }
+  .opt { background: #0b1324; border: 1px solid #1f2d47; border-radius: 10px; padding: 10px 12px; cursor: pointer; display: flex; gap: 10px; align-items: flex-start; transition: .15s; font-size: 13.5px; }
+  .opt:hover { border-color: var(--cyan-2); }
+  .opt .n { font-family: var(--mono); color: var(--cyan); font-weight: 700; flex-shrink: 0; }
+  .opt.wrong { border-color: var(--red); background: rgba(248,113,113,.08); }
+  .opt.right { border-color: var(--green); background: rgba(52,211,153,.1); }
+  .opt .why { display: none; font-size: 12.5px; color: #fca5a5; margin-top: 6px; }
+  .opt.wrong .why { display: block; }
+  .num-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .num-row input { background: #050912; border: 1px solid #1f2d47; color: var(--cyan); font-family: var(--mono); font-size: 18px; padding: 8px 12px; border-radius: 8px; width: 150px; outline: none; }
+  .num-row input:focus { border-color: var(--cyan); }
+  .btn { background: linear-gradient(135deg, #0891b2, #22d3ee); color: #04121a; border: none; padding: 10px 18px; border-radius: 9px; cursor: pointer; font-weight: 800; font-size: 13.5px; transition: .2s; letter-spacing: .02em; }
+  .btn:hover { box-shadow: 0 0 22px var(--cyan-glow); transform: translateY(-1px); }
+  .btn.ghost { background: transparent; border: 1px solid var(--line); color: var(--muted); }
+  .btn.ghost:hover { color: var(--cyan); border-color: var(--cyan); box-shadow: none; }
+  .btn.green { background: linear-gradient(135deg, #059669, #34d399); }
+  .btn.amber { background: linear-gradient(135deg, #d97706, #fbbf24); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; transform: none; box-shadow: none; }
+  .frag-reveal { display: flex; align-items: center; gap: 12px; margin-top: 12px; padding: 10px 12px; background: rgba(34,211,238,.08); border: 1px dashed rgba(34,211,238,.5); border-radius: 10px; }
+  .frag-reveal .big { font-family: var(--mono); font-size: 30px; font-weight: 800; color: var(--cyan); text-shadow: 0 0 16px var(--cyan-glow); }
+  .hint-line { font-size: 12.5px; color: #fde68a; margin-top: 8px; display: none; }
+
+  /* ---------- monitor ---------- */
+  #ecg-modal-canvas { width: 100%; height: 150px; background: #03110b; border-radius: 10px; border: 1px solid rgba(52,211,153,.3); display: block; }
+  .mon-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin: 12px 0; }
+  .mon { border-radius: 10px; padding: 10px; text-align: center; border: 1px solid; }
+  .mon .k { font-size: 10px; letter-spacing: .1em; font-weight: 700; opacity: .8; }
+  .mon .v { font-family: var(--mono); font-size: 24px; font-weight: 800; line-height: 1.2; }
+  .mon.g { background: #04281c; border-color: #059669; color: #34d399; }
+  .mon.b { background: #0c1a3d; border-color: #3b82f6; color: #60a5fa; }
+  .mon.r { background: #3a0d0d; border-color: #dc2626; color: #f87171; }
+  .mon.y { background: #3a2a05; border-color: #d97706; color: #fbbf24; }
+  .mon.p { background: #2a1547; border-color: #8b5cf6; color: #c4b5fd; }
+
+  /* ---------- imagen ---------- */
+  #img-wrap { position: relative; background: #000; border-radius: 10px; border: 1px solid #1f2d47; overflow: hidden; }
+  #img-canvas { width: 100%; display: block; aspect-ratio: 16 / 9; cursor: crosshair; }
+  #img-marker { position: absolute; width: 26px; height: 26px; border: 2px solid var(--amber); border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; display: none; box-shadow: 0 0 12px var(--amber); }
+  #img-marker.ok { border-color: var(--green); box-shadow: 0 0 14px var(--green); }
+  #img-marker.bad { border-color: var(--red); box-shadow: 0 0 14px var(--red); }
+  #img-report { font-size: 13.5px; color: #c7d3e6; margin-top: 10px; }
+
+  /* ---------- farmacia ---------- */
+  .keypad-wrap { display: flex; flex-direction: column; align-items: center; gap: 14px; margin: 10px 0; }
+  .code-screen { width: 240px; height: 58px; background: #020611; border: 2px solid #0e7490; border-radius: 10px; font-family: var(--mono); font-size: 34px; color: var(--cyan); display: flex; justify-content: center; align-items: center; letter-spacing: 14px; padding-left: 14px; box-shadow: inset 0 0 20px rgba(14,116,144,.4); }
+  .code-screen.ok { color: var(--green); border-color: var(--green); } .code-screen.bad { color: var(--red); border-color: var(--red); }
+  .keys { display: grid; grid-template-columns: repeat(3, 68px); gap: 8px; }
+  .key { background: #101a2e; color: var(--text); border: 1px solid #1f2d47; height: 48px; font-size: 20px; font-weight: 700; border-radius: 10px; cursor: pointer; transition: .12s; font-family: var(--mono); }
+  .key:hover { background: #0e7490; color: #fff; } .key.c { color: var(--red); } .key.ok { color: var(--green); }
+  .steps { display: flex; gap: 6px; margin-bottom: 14px; }
+  .step { flex: 1; text-align: center; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 700; color: var(--muted); padding: 7px; border-radius: 8px; border: 1px solid #1f2d47; }
+  .step.active { color: var(--cyan); border-color: var(--cyan-2); background: rgba(34,211,238,.08); }
+  .step.done { color: var(--green); border-color: var(--green); }
+
+  /* ---------- debrief ---------- */
+  .debrief h4 { margin: 16px 0 6px; color: var(--cyan); font-size: 13px; letter-spacing: .08em; text-transform: uppercase; }
+  .debrief ul { margin: 6px 0 0 18px; padding: 0; } .debrief li { margin-bottom: 6px; }
+  .debrief p { margin: 6px 0; }
+  .score-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin: 12px 0 4px; }
+  .sc { background: #0b1324; border: 1px solid #1a2740; border-radius: 10px; padding: 10px; text-align: center; }
+  .sc .k { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+  .sc .v { font-family: var(--mono); font-size: 22px; font-weight: 800; color: var(--cyan); }
+  .modal-foot { padding: 12px 22px; border-top: 1px solid var(--line); display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
+
+  /* ---------- pantalla de inicio ---------- */
+  #intro { position: absolute; inset: 0; z-index: 100; background: radial-gradient(ellipse at 50% 0%, rgba(14, 116, 144, .35), transparent 55%), linear-gradient(180deg, #070b14, #0b1224 60%, #070b14); overflow-y: auto; pointer-events: auto; }
+  #intro .wrap { max-width: 1080px; margin: 0 auto; padding: 44px 22px 60px; }
+  #intro h1 { font-size: clamp(30px, 5vw, 50px); margin: 0; font-weight: 800; letter-spacing: -.02em; line-height: 1.05; }
+  #intro h1 span { color: var(--cyan); text-shadow: 0 0 30px var(--cyan-glow); }
+  #intro .sub { color: var(--muted); font-size: 16px; margin: 12px 0 0; max-width: 680px; line-height: 1.5; }
+  #intro .eyebrow { font-size: 12px; letter-spacing: .2em; text-transform: uppercase; color: var(--cyan); font-weight: 800; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; }
+  .howto { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin: 26px 0; }
+  .how { background: rgba(255,255,255,.03); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; font-size: 13px; color: #c7d3e6; display: flex; gap: 10px; }
+  .how b { color: var(--text); display: block; margin-bottom: 3px; }
+  .how .num { font-family: var(--mono); color: var(--cyan); font-weight: 800; font-size: 18px; }
+  .cases { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; margin-top: 14px; }
+  .case-card { background: linear-gradient(180deg, rgba(17, 25, 44, .9), rgba(10, 16, 30, .9)); border: 1px solid var(--line); border-radius: 14px; padding: 16px; cursor: pointer; transition: .2s; position: relative; display: flex; flex-direction: column; gap: 6px; }
+  .case-card:hover { transform: translateY(-3px); border-color: var(--cyan); box-shadow: 0 14px 40px rgba(0,0,0,.5), 0 0 30px rgba(34,211,238,.12); }
+  .case-card .sys { font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--cyan); font-weight: 800; }
+  .case-card .t { font-weight: 700; font-size: 15px; line-height: 1.3; }
+  .case-card .s { font-size: 12px; color: var(--muted); }
+  .case-card .meta { display: flex; justify-content: space-between; align-items: center; margin-top: auto; padding-top: 8px; font-size: 12px; color: var(--muted); }
+  .case-card .best { font-family: var(--mono); color: var(--green); font-weight: 700; }
+  .case-card .num { position: absolute; top: 12px; right: 14px; font-family: var(--mono); font-size: 22px; font-weight: 800; color: rgba(34,211,238,.25); }
+  .case-card.done::after { content: '✓ resuelto'; position: absolute; top: 12px; right: 14px; background: rgba(52,211,153,.15); color: var(--green); border: 1px solid rgba(52,211,153,.4); font-size: 10px; font-weight: 800; letter-spacing: .08em; padding: 3px 8px; border-radius: 20px; }
+  .case-card.done .num { display: none; }
+  .stars { color: var(--amber); letter-spacing: 2px; }
+  .intro-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 22px; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; background: rgba(255,255,255,.04); border: 1px solid var(--line); padding: 5px 10px; border-radius: 20px; font-size: 12px; color: var(--muted); }
+  #loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--cyan); font-family: var(--mono); z-index: 200; background: var(--bg); flex-direction: column; gap: 10px; }
+  #loading .bar { width: 220px; height: 4px; background: #101a2e; border-radius: 2px; overflow: hidden; }
+  #loading .bar i { display: block; height: 100%; width: 40%; background: var(--cyan); animation: load 1.1s infinite ease-in-out; }
+  @keyframes load { 0% { transform: translateX(-100%);} 100% { transform: translateX(320%);} }
+
+  @media (max-width: 720px) {
+    #app { font-size: 14px; }
+    #case-badge { max-width: 58vw; padding: 8px 12px; } #case-badge .ttl { font-size: 13px; }
+    #timer { font-size: 22px; } #code-panel { padding: 6px 10px; } .frag { width: 28px; height: 34px; font-size: 16px; }
+    .nav-btn span.lbl { display: none; } .nav-btn { padding: 9px 11px; }
+    .modal-body { padding: 14px; } .keys { grid-template-columns: repeat(3, 60px); }
+    #score { display: none; }
+    #code-panel .lbl { display: none; } .frag { width: 26px; height: 32px; font-size: 15px; } .frag small { font-size: 7px; }
+    #case-badge .pt { display: none; } #case-badge > i { display: none !important; }
+    #timer-panel { padding: 6px 10px; gap: 8px; } .icon-btn span { display: none; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="loading"><div>Preparando la sala de medicina interna…</div><div class="bar"><i></i></div></div>
+
+  <!-- ===== PANTALLA DE INICIO ===== -->
+  <div id="intro">
+    <div class="wrap">
+      <div class="eyebrow"><i data-icon="paw" style="width:16px;height:16px;display:inline-block"></i> Escape room clínico · Medicina interna de pequeños animales</div>
+      <h1>Vet<span>Escape</span><br>Sala de Medicina Interna</h1>
+      <p class="sub">Un paciente se descompensa en tu sala. Explora las cinco estaciones, interpreta la exploración, el monitor, la analítica y la imagen, reúne los cuatro dígitos del código de la farmacia y elige el diagnóstico y el tratamiento correctos antes de que se agote el tiempo.</p>
+      <div class="howto">
+        <div class="how"><span class="num">1</span><div><b>Explora la sala 3D</b>Arrastra para girar, rueda para acercar. Haz clic en cada estación o usa la barra inferior.</div></div>
+        <div class="how"><span class="num">2</span><div><b>Resuelve un enigma por estación</b>Cada acierto libera un dígito. Los errores cuestan 45 s; las pistas, 60 s.</div></div>
+        <div class="how"><span class="num">3</span><div><b>Abre la farmacia</b>Teclea el código de 4 dígitos, confirma el diagnóstico y elige el protocolo terapéutico.</div></div>
+        <div class="how"><span class="num">4</span><div><b>Debriefing</b>Cada caso termina con las claves fisiopatológicas y el porqué de cada opción.</div></div>
+      </div>
+      <div class="eyebrow">Elige un caso</div>
+      <div class="cases" id="case-cards"></div>
+      <div class="intro-actions">
+        <button class="btn" id="btn-campaign">▶ Modo campaña · los 5 casos seguidos</button>
+        <span class="pill">⏱ 20 min por caso</span>
+        <span class="pill">Nivel: veterinario clínico</span>
+        <button class="btn ghost" id="btn-reset-progress" style="margin-left:auto">Borrar progreso</button>
+      </div>
+      <p style="color:var(--muted);font-size:12px;margin-top:26px;line-height:1.5">Los casos son ficticios y están construidos con fines docentes. Las dosis y protocolos son orientativos y deben contrastarse con la bibliografía y el criterio clínico. Sonido sintetizado con Web Audio; no se cargan recursos externos salvo Three.js y las fuentes.</p>
+    </div>
+  </div>
+
+  <div id="canvas-container"></div>
+
+  <!-- ===== HUD ===== -->
+  <div id="hud">
+    <div id="labels"></div>
+    <div id="cue"></div>
+    <div id="top-bar">
+      <div class="panel" id="case-badge">
+        <i data-icon="paw" style="width:26px;height:26px;color:var(--cyan);flex-shrink:0"></i>
+        <div style="min-width:0">
+          <div class="sys" id="hud-sys">—</div>
+          <div class="ttl" id="hud-title">—</div>
+          <div class="pt" id="hud-patient">—</div>
+        </div>
+      </div>
+      <div id="right-hud">
+        <div class="panel" id="timer-panel">
+          <div id="score"><span id="score-line">Errores 0 · Pistas 0</span><br><b id="score-val">—</b></div>
+          <div id="timer">20:00</div>
+          <button class="icon-btn" id="btn-menu" title="Volver al menú"><i data-icon="menu"></i><span>Menú</span></button>
+        </div>
+        <div class="panel" id="code-panel">
+          <span class="lbl">Código farmacia</span>
+          <div class="frag" id="frag-patient"><span>?</span><small>PAC</small></div>
+          <div class="frag" id="frag-monitor"><span>?</span><small>ECG</small></div>
+          <div class="frag" id="frag-lab"><span>?</span><small>LAB</small></div>
+          <div class="frag" id="frag-imaging"><span>?</span><small>IMG</small></div>
+        </div>
+      </div>
+    </div>
+    <div id="hint-msg"></div>
+    <div class="panel" id="quick-nav">
+      <button class="nav-btn" data-view="patient"><i data-icon="paw"></i><span class="lbl">Paciente</span><span class="chk">✓</span></button>
+      <button class="nav-btn" data-view="monitor"><i data-icon="heart"></i><span class="lbl">Monitor</span><span class="chk">✓</span></button>
+      <button class="nav-btn" data-view="lab"><i data-icon="flask"></i><span class="lbl">Laboratorio</span><span class="chk">✓</span></button>
+      <button class="nav-btn" data-view="imaging"><i data-icon="xray"></i><span class="lbl">Imagen</span><span class="chk">✓</span></button>
+      <button class="nav-btn" data-view="cabinet"><i data-icon="lock"></i><span class="lbl">Farmacia</span><span class="chk">✓</span></button>
+      <button class="nav-btn" data-view="overview"><i data-icon="eye"></i><span class="lbl">Sala</span></button>
+    </div>
+    <div id="toast"></div>
+  </div>
+
+  <!-- ===== MODALES ===== -->
+  <div class="modal-bg" id="mb-patient"><div class="modal wide">
+    <div class="modal-head"><h2><i data-icon="paw"></i> Historia clínica y exploración</h2><button class="x" data-close="mb-patient">×</button></div>
+    <div class="modal-body" id="patient-body"></div>
+  </div></div>
+
+  <div class="modal-bg" id="mb-monitor"><div class="modal">
+    <div class="modal-head"><h2><i data-icon="heart"></i> Monitor multiparamétrico · DII</h2><button class="x" data-close="mb-monitor">×</button></div>
+    <div class="modal-body"><canvas id="ecg-modal-canvas" width="900" height="150"></canvas><div id="monitor-body"></div></div>
+  </div></div>
+
+  <div class="modal-bg" id="mb-lab"><div class="modal wide">
+    <div class="modal-head"><h2><i data-icon="flask"></i> Laboratorio de urgencias</h2><button class="x" data-close="mb-lab">×</button></div>
+    <div class="modal-body"><div class="tabs" id="lab-tabs"></div><div id="lab-body"></div><div id="lab-puzzle"></div></div>
+  </div></div>
+
+  <div class="modal-bg" id="mb-imaging"><div class="modal wide">
+    <div class="modal-head"><h2><i data-icon="xray"></i> Diagnóstico por imagen</h2><button class="x" data-close="mb-imaging">×</button></div>
+    <div class="modal-body">
+      <div class="tabs" id="img-tabs"></div>
+      <div id="img-wrap"><canvas id="img-canvas" width="960" height="540"></canvas><div id="img-marker"></div></div>
+      <div id="img-report"></div>
+      <div id="img-puzzle"></div>
+    </div>
+  </div></div>
+
+  <div class="modal-bg" id="mb-cabinet"><div class="modal">
+    <div class="modal-head"><h2><i data-icon="lock"></i> Farmacia de seguridad</h2><button class="x" data-close="mb-cabinet">×</button></div>
+    <div class="modal-body">
+      <div class="steps"><div class="step active" id="stp-1">1 · Código</div><div class="step" id="stp-2">2 · Diagnóstico</div><div class="step" id="stp-3">3 · Tratamiento</div></div>
+      <div id="cab-body"></div>
+    </div>
+  </div></div>
+
+  <div class="modal-bg" id="mb-debrief"><div class="modal wide">
+    <div class="modal-head"><h2 style="color:var(--green)"><i data-icon="check"></i> Caso resuelto · Debriefing</h2></div>
+    <div class="modal-body debrief" id="debrief-body"></div>
+    <div class="modal-foot" id="debrief-foot"></div>
+  </div></div>
+
+  <div class="modal-bg" id="mb-fail"><div class="modal">
+    <div class="modal-head"><h2 style="color:var(--red)"><i data-icon="alert"></i> El paciente se ha descompensado</h2></div>
+    <div class="modal-body" id="fail-body"></div>
+    <div class="modal-foot"><button class="btn ghost" id="btn-fail-menu">Volver al menú</button><button class="btn" id="btn-fail-retry">Reintentar el caso</button></div>
+  </div></div>
+
+  <div class="modal-bg" id="mb-final"><div class="modal">
+    <div class="modal-head"><h2 style="color:var(--green)"><i data-icon="trophy"></i> Campaña completada</h2></div>
+    <div class="modal-body" id="final-body"></div>
+    <div class="modal-foot"><button class="btn" id="btn-final-menu">Volver al menú</button></div>
+  </div></div>
+
+  <div class="modal-bg" id="mb-confirm"><div class="modal" style="max-width:440px">
+    <div class="modal-head"><h2>¿Abandonar el caso?</h2></div>
+    <div class="modal-body">Perderás el progreso de este caso (los dígitos reunidos y el tiempo restante).</div>
+    <div class="modal-foot"><button class="btn ghost" data-close="mb-confirm">Seguir jugando</button><button class="btn amber" id="btn-confirm-menu">Volver al menú</button></div>
+  </div></div>
+</div>
+<script>
+/* =====================================================================
+   BASE DE CASOS CLÍNICOS — VetEscape · Medicina Interna
+   Cada caso: reseña, anamnesis, exploración por regiones, ECG paramétrico,
+   laboratorio por pestañas, imagen (RX / eco / frotis) con hotspots,
+   4 puzles (uno por estación) que liberan un dígito del código de la
+   farmacia, diagnóstico y tratamiento con explicación de cada opción.
+   ===================================================================== */
+const CASES = [
+/* ------------------------------------------------------------------ */
+{
+  id: 'taponamiento',
+  n: 1,
+  system: 'Cardiología',
+  species: 'dog',
+  difficulty: 2,
+  title: 'Colapso y distensión abdominal',
+  patient: 'Thor',
+  signalment: 'Perro · Golden Retriever · macho entero · 9 años · 34 kg',
+  history: 'Dos episodios de colapso en las últimas 48 h con recuperación espontánea en minutos. Distensión abdominal progresiva desde hace una semana, intolerancia al ejercicio, tos ocasional e inapetencia. Sin tratamientos previos. Vacunado y desparasitado.',
+  vitals: [
+    ['FC', '180 lpm', 'bad'], ['FR', '40 rpm', 'warn'], ['Tª', '37,8 ºC', 'ok'],
+    ['PAS Doppler', '85 mmHg', 'bad'], ['TRC', '3 s', 'bad'], ['SpO₂', '94 %', 'warn'],
+    ['Mucosas', 'pálidas', 'bad'], ['Pulso', 'débil, se atenúa en inspiración', 'bad']
+  ],
+  monitor: { hr: 180, spo2: 94, bp: '85/50', map: 62, rr: 40, temp: 37.8 },
+  exam: [
+    ['Cabeza y mucosas', 'Mucosas pálidas, TRC 3 s. Distensión y pulso yugular visibles con el cuello en extensión.'],
+    ['Auscultación', 'Ruidos cardíacos marcadamente apagados en ambos hemitórax. Sin soplo audible. Campos pulmonares limpios.'],
+    ['Abdomen', 'Distensión con onda de fluido positiva (ascitis). Hepatomegalia palpable, no dolorosa.'],
+    ['Extremidades y pulso', 'Pulso femoral débil que se atenúa claramente con la inspiración (pulso paradójico). Extremidades frías.'],
+    ['Piel y linfonodos', 'Sin alteraciones. Linfonodos periféricos de tamaño normal.'],
+    ['Neurológico', 'Consciente, debilidad generalizada; sin déficits focales.']
+  ],
+  ecg: { rate: 180, rAmp: 0.45, pAmp: 0.08, tAmp: 0.12, alternans: true,
+    desc: 'Taquicardia sinusal a 180 lpm. Complejos QRS de bajo voltaje (< 1 mV en DII) con variación cíclica, latido a latido, de la amplitud de la onda R.' },
+  lab: [
+    { name: 'Hemograma', rows: [
+      ['Hematocrito', '33 %', '37 – 55', 'low'], ['Plaquetas', '138 ×10³/µL', '200 – 500', 'low'],
+      ['Leucocitos', '14,2 ×10³/µL', '6 – 17', 'ok'], ['Proteínas totales', '5,9 g/dL', '5,5 – 7,5', 'ok'] ] },
+    { name: 'Bioquímica', rows: [
+      ['ALT', '215 U/L', '10 – 100', 'high'], ['ALP', '190 U/L', '20 – 150', 'high'],
+      ['Albúmina', '2,4 g/dL', '2,6 – 3,8', 'low'], ['Creatinina', '1,6 mg/dL', '0,5 – 1,4', 'high'],
+      ['BUN', '38 mg/dL', '10 – 30', 'high'], ['Glucosa', '104 mg/dL', '70 – 120', 'ok'],
+      ['Troponina I', '1,9 ng/mL', '< 0,1', 'high'] ] },
+    { name: 'Gases e iones', rows: [
+      ['pH venoso', '7,29', '7,35 – 7,45', 'low'], ['HCO₃⁻', '16 mmol/L', '18 – 26', 'low'],
+      ['pCO₂', '33 mmHg', '35 – 45', 'low'], ['Lactato', '4,8 mmol/L', '< 2,5', 'high'],
+      ['Na⁺', '142 mEq/L', '140 – 150', 'ok'], ['K⁺', '4,1 mEq/L', '3,8 – 5,4', 'ok'], ['Cl⁻', '108 mEq/L', '105 – 115', 'ok'] ] },
+    { name: 'Orina y líquidos', rows: [
+      ['Densidad urinaria', '1,038', '> 1,030', 'ok'], ['Proteinuria', 'negativa', 'negativa', 'ok'],
+      ['Líquido abdominal', 'transudado modificado', '—', 'high'], ['PT líquido', '3,1 g/dL', '< 2,5', 'high'],
+      ['Celularidad líquido', '1.800 /µL', '< 1.000', 'high'] ] }
+  ],
+  imaging: {
+    rx: { heart: 1.75, lungs: 'clean', cvc: 'wide', liver: 1.3, species: 'dog',
+      report: 'Silueta cardíaca globosa, muy aumentada (VHS 13,4 v), de bordes lisos que borran la definición de las cámaras. Campos pulmonares sin patrón alveolar ni intersticial. Vena cava caudal distendida. Hepatomegalia con desplazamiento caudal del eje gástrico.' },
+    us: { scene: 'pericardial',
+      report: 'Efusión pericárdica anecoica circunferencial (hasta 2,8 cm) con colapso diastólico de la aurícula derecha. Masa heterogénea de 3 × 2,5 cm en la aurícula/orejuela derecha. Sin efusión pleural. Escaso líquido libre abdominal.' }
+  },
+  puzzles: {
+    patient: { type: 'mc', digit: '4',
+      q: '¿Qué combinación de hallazgos define la tríada clásica que apunta a la fisiopatología subyacente?',
+      opts: ['Hipotensión + ruidos cardíacos apagados + distensión yugular (tríada de Beck)',
+             'Taquicardia + mucosas pálidas + TRC prolongado',
+             'Ascitis + hepatomegalia + soplo sistólico',
+             'Fiebre + tos + crepitaciones pulmonares'],
+      ok: 0, hint: 'Busca los hallazgos que sólo aparecen cuando el llenado ventricular está mecánicamente restringido: la sangre "se queda" antes del corazón.' },
+    monitor: { type: 'mc', digit: '1',
+      q: '¿Qué alteración electrocardiográfica identificas y qué sugiere?',
+      opts: ['Alternancia eléctrica con bajo voltaje: el corazón oscila dentro de un gran derrame pericárdico',
+             'Bloqueo AV de segundo grado Mobitz I: enfermedad del sistema de conducción',
+             'Fibrilación auricular: dilatación auricular por valvulopatía mitral',
+             'Taquicardia ventricular sostenida: hipoxia miocárdica'],
+      ok: 0, hint: 'Fíjate en la altura de las ondas R: un latido sí, un latido no.' },
+    lab: { type: 'num', digit: '8', answer: 2.12, tol: 0.15, unit: '',
+      q: 'Calcula el índice de shock (FC ÷ PAS Doppler) con las constantes del triaje. Un valor > 1 apoya shock y > 2 compromiso hemodinámico grave. Redondea a un decimal.',
+      hint: 'FC 180 lpm y PAS 85 mmHg. Divide.' },
+    imaging: { type: 'hot', digit: '2', mode: 'us', x: 0.71, y: 0.39, r: 0.10,
+      q: 'Señala en la ECOGRAFÍA la lesión estructural que explica el derrame (no el propio derrame).',
+      hint: 'Busca una masa heterogénea adherida a la pared de la aurícula derecha, en el lado derecho de la imagen.' }
+  },
+  code: '4182',
+  diagnosis: {
+    q: 'Con todo lo recopilado, ¿cuál es tu diagnóstico?',
+    opts: [
+      { t: 'Taponamiento cardíaco por efusión pericárdica secundaria a masa de aurícula derecha (probable hemangiosarcoma)', ok: true },
+      { t: 'Insuficiencia cardíaca congestiva derecha por cardiomiopatía dilatada', why: 'La CMD cursa con cámaras dilatadas y contractilidad reducida en el eco, no con derrame circunferencial y colapso de aurícula derecha. La alternancia eléctrica es casi patognomónica de derrame.' },
+      { t: 'Enfermedad valvular mitral degenerativa descompensada', why: 'Sin soplo, sin edema pulmonar ni dilatación de aurícula izquierda. La ascitis sin edema pulmonar apunta a cavidades derechas o al pericardio.' },
+      { t: 'Hipoadrenocorticismo con colapso hipovolémico', why: 'Na⁺/K⁺ normales y ausencia de bradicardia. La distensión yugular y el pulso paradójico son incompatibles con una hipovolemia pura.' },
+      { t: 'Torsión de lóbulo hepático con hemoabdomen', why: 'El líquido abdominal es un transudado modificado, no hemorrágico, y el hallazgo dominante (silueta globosa + derrame pericárdico) es cardíaco.' }
+    ] },
+  treatment: {
+    q: 'Selecciona el protocolo de estabilización inmediata.',
+    opts: [
+      { t: 'Pericardiocentesis ecoguiada (decúbito lateral izquierdo, 4º-5º EIC derecho, ECG continuo) precedida de un bolo de cristaloide de 10-15 mL/kg para sostener la precarga; análisis del líquido', ok: true },
+      { t: 'Furosemida 2 mg/kg IV + pimobendán + oxígeno', why: 'Error crítico: en el taponamiento el gasto cardíaco depende de la precarga. Diuréticos y vasodilatadores reducen el retorno venoso y pueden precipitar una parada cardiocirculatoria.' },
+      { t: 'Abdominocentesis evacuadora de gran volumen + restricción de fluidos', why: 'Trata el síntoma (ascitis) y retira volumen de un paciente precarga-dependiente. La ascitis se resolverá sola al liberar el pericardio.' },
+      { t: 'Atropina 0,04 mg/kg + dopamina en CRI', why: 'No hay bradicardia. Los inotrópicos/cronotrópicos no vencen la restricción mecánica al llenado y aumentan el consumo miocárdico de oxígeno.' },
+      { t: 'Toracotomía y pericardiectomía de urgencia sin estabilización previa', why: 'Anestesiar a un paciente en taponamiento no drenado conlleva una mortalidad altísima. La pericardiectomía se plantea de forma programada tras estabilizar y estadificar.' }
+    ] },
+  debrief: `
+    <p><strong>Diagnóstico final:</strong> taponamiento cardíaco por efusión pericárdica secundaria a una masa de aurícula derecha (hemangiosarcoma el más probable en un Golden de 9 años; quimiodectoma y mesotelioma como alternativas).</p>
+    <h4>Claves que resolvían el caso</h4>
+    <ul>
+      <li><strong>Tríada de Beck</strong> (hipotensión, ruidos apagados, distensión yugular) + <strong>pulso paradójico</strong>: la restricción diastólica hace que el gasto dependa por completo del retorno venoso.</li>
+      <li><strong>Alternancia eléctrica</strong> con bajo voltaje: el corazón "nada" dentro del derrame y cambia de posición latido a latido.</li>
+      <li><strong>Silueta globosa con pulmón limpio</strong>: cardiomegalia radiográfica sin edema debe hacer pensar en derrame pericárdico antes que en insuficiencia izquierda.</li>
+      <li><strong>Ascitis con transudado modificado</strong> e hipoalbuminemia leve: congestión derecha de instauración subaguda.</li>
+    </ul>
+    <h4>Por qué el tratamiento</h4>
+    <p>La pericardiocentesis es diagnóstica y terapéutica. El bolo previo de cristaloides mantiene la precarga durante el procedimiento. Furosemida, pimobendán, vasodilatadores y la anestesia general antes del drenaje son las causas más frecuentes de muerte iatrogénica en estos pacientes.</p>
+    <h4>Después de escapar de la sala</h4>
+    <p>Ecocardiografía completa por un cardiólogo tras el drenaje (la masa se ve mejor con líquido), estadificación con ecografía abdominal y radiografías torácicas en tres proyecciones, troponina como marcador de daño miocárdico, y conversación con la familia: la mediana de supervivencia del hemangiosarcoma de aurícula derecha con cirugía + doxorrubicina se sitúa en torno a 4-6 meses; sin tratamiento, semanas.</p>`
+},
+/* ------------------------------------------------------------------ */
+{
+  id: 'leptospirosis',
+  n: 2,
+  system: 'Nefrología · Hepatología',
+  species: 'dog',
+  difficulty: 3,
+  title: 'Vómitos, ictericia y oliguria en un perro de caza',
+  patient: 'Xurxo',
+  signalment: 'Perro · Pointer inglés · macho entero · 5 años · 22 kg',
+  history: 'Perro de caza que frecuenta zonas encharcadas y márgenes de río en A Mariña. Vacuna de leptospirosis bivalente caducada hace 18 meses. Desde hace 4 días: vómitos, letargia y anorexia; PU/PD marcada los dos primeros días y, desde ayer, casi no orina. El propietario ha visto las encías amarillentas esta mañana.',
+  vitals: [
+    ['FC', '130 lpm', 'warn'], ['FR', '44 rpm', 'bad'], ['Tª', '39,9 ºC', 'bad'],
+    ['PAS Doppler', '140 mmHg', 'ok'], ['TRC', '2 s', 'ok'], ['SpO₂', '93 %', 'warn'],
+    ['Mucosas', 'ictéricas con petequias', 'bad'], ['Pulso', 'fuerte, sincrónico', 'ok']
+  ],
+  monitor: { hr: 130, spo2: 93, bp: '140/85', map: 103, rr: 44, temp: 39.9 },
+  exam: [
+    ['Cabeza y mucosas', 'Ictericia de escleras y mucosas; petequias en encías. Ligera hiperemia conjuntival.'],
+    ['Auscultación', 'Crepitaciones húmedas bilaterales, más marcadas en lóbulos caudales. Ritmo cardíaco regular.'],
+    ['Abdomen', 'Dolor a la palpación lumbar/renal bilateral; riñones aumentados de tamaño y lisos. Hepatomegalia leve. Vejiga pequeña.'],
+    ['Extremidades y pulso', 'Pulso fuerte y sincrónico. Sin edemas.'],
+    ['Piel y linfonodos', 'Petequias en abdomen ventral. Linfonodos normales.'],
+    ['Neurológico', 'Deprimido pero responde; sin déficits.']
+  ],
+  ecg: { rate: 130, rAmp: 0.9, pAmp: 0.1, tAmp: 0.85, tWidth: 0.028, peaked: true,
+    desc: 'Ritmo sinusal regular a 130 lpm. Ondas T altas, estrechas y simétricas ("en tienda de campaña"); intervalo PR en el límite alto; QRS de duración normal.' },
+  lab: [
+    { name: 'Hemograma', rows: [
+      ['Hematocrito', '34 %', '37 – 55', 'low'], ['Plaquetas', '46 ×10³/µL', '200 – 500', 'low'],
+      ['Leucocitos', '24,8 ×10³/µL', '6 – 17', 'high'], ['Neutrófilos', '21,1 ×10³/µL (1,8 bandas)', '3 – 11,5', 'high'],
+      ['Linfocitos', '1,2 ×10³/µL', '1 – 4,8', 'ok'] ] },
+    { name: 'Bioquímica', rows: [
+      ['Creatinina', '5,8 mg/dL', '0,5 – 1,4', 'high'], ['BUN', '168 mg/dL', '10 – 30', 'high'],
+      ['Fósforo', '9,2 mg/dL', '2,5 – 5,5', 'high'], ['ALT', '320 U/L', '10 – 100', 'high'],
+      ['ALP', '910 U/L', '20 – 150', 'high'], ['Bilirrubina total', '3,4 mg/dL', '0 – 0,4', 'high'],
+      ['Albúmina', '2,5 g/dL', '2,6 – 3,8', 'low'], ['Glucosa', '92 mg/dL', '70 – 120', 'ok'], ['CK', '480 U/L', '< 300', 'high'] ] },
+    { name: 'Gases e iones', rows: [
+      ['pH venoso', '7,24', '7,35 – 7,45', 'low'], ['HCO₃⁻', '14 mmol/L', '18 – 26', 'low'],
+      ['K⁺', '6,4 mEq/L', '3,8 – 5,4', 'high'], ['Na⁺', '141 mEq/L', '140 – 150', 'ok'],
+      ['Cl⁻', '104 mEq/L', '105 – 115', 'low'], ['Lactato', '2,8 mmol/L', '< 2,5', 'high'] ] },
+    { name: 'Orina (cistocentesis)', rows: [
+      ['Densidad urinaria', '1,012', '> 1,030', 'low'], ['Proteína urinaria', '180 mg/dL (tira +++)', 'negativa', 'high'],
+      ['Creatinina urinaria', '60 mg/dL', '—', 'ok'], ['Glucosuria', 'positiva (+) con glucemia normal', 'negativa', 'high'],
+      ['Bilirrubinuria', '++', 'negativa / traza', 'high'], ['Cilindros granulosos', '3 – 5 / campo', 'ausentes', 'high'],
+      ['Bacterias', 'no se observan', 'ausentes', 'ok'],
+      ['Diuresis (sonda cerrada)', '20 mL en 2 h (0,45 mL/kg/h)', '> 1 mL/kg/h', 'low'] ] },
+    { name: 'Pruebas específicas', rows: [
+      ['SNAP Lepto (IgM)', 'positivo', 'negativo', 'high'], ['PCR Leptospira sangre/orina', 'enviada', '—', 'ok'],
+      ['MAT (título basal)', 'enviado', '—', 'ok'], ['Test Angiostrongylus', 'negativo', 'negativo', 'ok'] ] }
+  ],
+  imaging: {
+    rx: { heart: 1.0, lungs: 'hemorrhage', cvc: 'normal', liver: 1.1, species: 'dog',
+      report: 'Patrón intersticial reticular a alveolar difuso, más intenso en lóbulos caudodorsales, sin la distribución perihiliar típica del edema cardiogénico. Silueta cardíaca normal. Hepatomegalia leve.' },
+    us: { scene: 'kidney',
+      report: 'Riñones aumentados (7,8 cm) con corteza hiperecogénica, pérdida de definición corticomedular, banda medular hiperecogénica y halo hipoecoico perirrenal. Pielectasia bilateral leve (3 mm). Hígado hipoecoico con vesícula de pared engrosada.' }
+  },
+  puzzles: {
+    patient: { type: 'mc', digit: '7',
+      q: 'Antes de continuar con la exploración y las pruebas, ¿cuál es la medida prioritaria en este momento?',
+      opts: ['Aplicar protocolo de bioseguridad (guantes, gafas, bata; aislar al paciente; desinfectar la orina con lejía diluida) por sospecha de zoonosis',
+             'Administrar un bolo de cristaloides de 20 mL/kg de inmediato',
+             'Sondar la vejiga y forzar la diuresis con furosemida',
+             'Administrar una dosis de prednisolona por la vasculitis'],
+      ok: 0, hint: 'Perro de caza en zonas encharcadas, fiebre, ictericia y fallo renal: piensa primero en quién más puede infectarse en la clínica.' },
+    monitor: { type: 'mc', digit: '3',
+      q: '¿Qué alteración identificas y con qué hallazgo de laboratorio esperas correlacionarla?',
+      opts: ['Ondas T picudas y simétricas: hiperpotasemia (K⁺ > 6 mEq/L) por fallo excretor renal',
+             'Ondas T aplanadas y onda U: hipopotasemia por vómitos',
+             'Prolongación del QT: hipocalcemia',
+             'Alternancia eléctrica: derrame pericárdico'],
+      ok: 0, hint: 'Mira la onda T: alta, estrecha, simétrica. Un riñón que no excreta acumula un ion en concreto.' },
+    lab: { type: 'num', digit: '0', answer: 3.0, tol: 0.12, unit: '',
+      q: 'Con los datos del urianálisis (proteína y creatinina urinarias en mg/dL), calcula el cociente proteína/creatinina en orina (UPC). Un decimal.',
+      hint: 'UPC = proteína urinaria ÷ creatinina urinaria, ambas en mg/dL.' },
+    imaging: { type: 'hot', digit: '5', mode: 'us', x: 0.50, y: 0.55, r: 0.16,
+      q: 'Señala en la ECOGRAFÍA el riñón que muestra líquido perirrenal (halo hipoecoico alrededor de la cápsula), un hallazgo muy sugerente de nefritis aguda infecciosa.',
+      hint: 'El riñón está en el centro de la imagen; el halo oscuro lo rodea por fuera de la cápsula.' }
+  },
+  code: '7305',
+  diagnosis: {
+    q: 'Con todo lo recopilado, ¿cuál es tu diagnóstico?',
+    opts: [
+      { t: 'Leptospirosis: lesión renal aguda (grado IV IRIS, oligúrica) con hepatopatía colestásica y síndrome hemorrágico pulmonar (LPHS)', ok: true },
+      { t: 'Intoxicación por etilenglicol', why: 'Sin exposición ni cristales de oxalato cálcico; calcio normal. La fiebre, las petequias, la ictericia y la leucocitosis con desviación a la izquierda no encajan.' },
+      { t: 'Pielonefritis bacteriana ascendente por E. coli', why: 'Sedimento sin bacterias ni piuria. La afectación hepática, pulmonar y la trombocitopenia orientan a una enfermedad sistémica.' },
+      { t: 'Hepatitis infecciosa canina (CAV-1)', why: 'Perro adulto con vacunación básica; el daño dominante es tubular renal (glucosuria normoglucémica, cilindros) con LRA oligúrica.' },
+      { t: 'Anemia hemolítica inmunomediada con nefropatía por hemoglobina', why: 'Un hematocrito del 34 % con ictericia leve no justifica una hemólisis masiva; no hay esferocitos ni autoaglutinación, y hay fiebre con leucocitosis marcada.' }
+    ] },
+  treatment: {
+    q: 'Selecciona el plan terapéutico correcto.',
+    opts: [
+      { t: 'Aislamiento + fluidoterapia guiada por diuresis y peso (evitar sobrecarga), manejo del K⁺, ampicilina 22 mg/kg IV/8 h en fase aguda seguida de doxiciclina 5 mg/kg/12 h durante 14 días; PCR + MAT pareado (0 y 14 días); consejo zoonósico a la familia y notificación', ok: true },
+      { t: 'Enrofloxacina 10 mg/kg + furosemida 2 mg/kg en bolo cada 6 h hasta recuperar la diuresis', why: 'Las fluoroquinolonas no son de elección frente a Leptospira. La furosemida no mejora la supervivencia en la LRA y sin una fluidoterapia dirigida agrava la hipovolemia.' },
+      { t: 'Prednisolona 2 mg/kg/día por la vasculitis y la trombocitopenia + transfusión de plaquetas', why: 'Inmunosuprimir durante una infección bacteriana activa es contraproducente; la trombocitopenia responde al tratamiento etiológico.' },
+      { t: 'Fomepizol 20 mg/kg IV + bicarbonato sódico', why: 'Antídoto específico del etilenglicol, sin utilidad aquí. El bicarbonato sólo se plantea con pH < 7,1 tras corregir la volemia.' },
+      { t: 'Bolo de cristaloides de 90 mL/kg + gentamicina 6 mg/kg/24 h', why: 'Un bolo de "dosis de shock" en un paciente normotenso, oligúrico y con pulmón dañado provoca sobrecarga y edema. Los aminoglucósidos son nefrotóxicos en la LRA.' }
+    ] },
+  debrief: `
+    <p><strong>Diagnóstico final:</strong> leptospirosis con lesión renal aguda oligúrica (IRIS grado IV), hepatopatía colestásica y síndrome hemorrágico pulmonar leptospiral (LPHS).</p>
+    <h4>Claves que resolvían el caso</h4>
+    <ul>
+      <li><strong>Epidemiología</strong>: perro de caza, agua estancada, vacuna caducada, otoño lluvioso en Galicia.</li>
+      <li><strong>Glucosuria con normoglucemia + cilindros granulosos</strong>: daño tubular proximal, la firma de la nefritis tubulointersticial leptospiral.</li>
+      <li><strong>Trombocitopenia + petequias + ictericia con ALP muy alta</strong>: vasculitis y colestasis intrahepática.</li>
+      <li><strong>Patrón pulmonar difuso con corazón normal</strong>: LPHS, el factor pronóstico negativo más importante.</li>
+      <li><strong>Halo perirrenal y banda medular hiperecogénica</strong>: inespecíficos, pero muy sugerentes de leptospirosis en el contexto.</li>
+    </ul>
+    <h4>Por qué el tratamiento</h4>
+    <p>La bioseguridad va antes que cualquier acción clínica. La fluidoterapia en LRA oligúrica se titula por diuresis y peso (el exceso mata por sobrecarga). Los betalactámicos IV cubren la fase leptospirémica y la doxiciclina elimina el estado de portador renal. El diagnóstico se confirma con PCR (antes de antibióticos, si es posible) y con seroconversión (MAT pareado ×4).</p>
+    <h4>Después de escapar de la sala</h4>
+    <p>Si la diuresis no se recupera en 24-48 h con volemia adecuada, la diálisis (hemodiálisis o CRRT) mejora la supervivencia. Consejo a la familia: revisión médica de los convivientes, desinfección de superficies, vacunación L4 del resto de perros de la casa y del coto. Hay que notificarlo: es una zoonosis.</p>`
+},
+/* ------------------------------------------------------------------ */
+{
+  id: 'hipercalcemia',
+  n: 3,
+  system: 'Endocrinología · Oncología',
+  species: 'dog',
+  difficulty: 2,
+  title: 'PU/PD, debilidad y ganglios grandes',
+  patient: 'Nala',
+  signalment: 'Perro · Bóxer · hembra esterilizada · 7 años · 28 kg',
+  history: 'Tres semanas de poliuria/polidipsia intensa (bebe más de 3 L/día), pérdida de peso, debilidad y temblores musculares. Vómitos esporádicos. El propietario nota "bultos" en el cuello desde hace 10 días. Come pienso comercial, sin acceso a rodenticidas ni a plantas.',
+  vitals: [
+    ['FC', '62 lpm', 'warn'], ['FR', '28 rpm', 'ok'], ['Tª', '38,2 ºC', 'ok'],
+    ['PAS Doppler', '130 mmHg', 'ok'], ['TRC', '2 s', 'ok'], ['SpO₂', '97 %', 'ok'],
+    ['Mucosas', 'rosadas, pegajosas', 'warn'], ['Peso', '28 kg (previo 31)', 'warn']
+  ],
+  monitor: { hr: 62, spo2: 97, bp: '130/80', map: 97, rr: 28, temp: 38.2 },
+  exam: [
+    ['Cabeza y mucosas', 'Mucosas rosadas y ligeramente pegajosas (deshidratación ≈ 6 %). Linfonodos mandibulares bilateralmente aumentados (3-4 cm), firmes, indoloros y móviles.'],
+    ['Auscultación', 'Bradicardia regular. Ruidos cardíacos algo apagados cranealmente; ligera disminución de la compresibilidad torácica craneal.'],
+    ['Abdomen', 'Esplenomegalia moderada, lisa. Riñones de tamaño normal. Sin dolor.'],
+    ['Extremidades y pulso', 'Debilidad muscular generalizada con temblores finos. Linfonodos poplíteos y preescapulares aumentados (2-3 cm).'],
+    ['Piel y linfonodos', 'Linfadenomegalia generalizada indolora. Sin lesiones cutáneas.'],
+    ['Neurológico', 'Sin déficits; la debilidad no es de origen neurológico.']
+  ],
+  ecg: { rate: 62, rAmp: 0.9, pAmp: 0.12, tAmp: 0.3, qtShort: true,
+    desc: 'Bradicardia sinusal a 62 lpm. Intervalo QT acortado (0,17 s), con una onda T que se inicia inmediatamente tras el QRS. PR y QRS de duración normal.' },
+  lab: [
+    { name: 'Hemograma', rows: [
+      ['Hematocrito', '41 %', '37 – 55', 'ok'], ['Plaquetas', '210 ×10³/µL', '200 – 500', 'ok'],
+      ['Leucocitos', '19,5 ×10³/µL', '6 – 17', 'high'], ['Linfocitos', '8,9 ×10³/µL (linfocitos grandes atípicos en frotis)', '1 – 4,8', 'high'] ] },
+    { name: 'Bioquímica', rows: [
+      ['Calcio total', '15,8 mg/dL', '9,0 – 11,5', 'high'], ['Calcio ionizado', '1,92 mmol/L', '1,20 – 1,40', 'high'],
+      ['Fósforo', '6,9 mg/dL', '2,5 – 5,5', 'high'], ['Albúmina', '3,1 g/dL', '2,6 – 3,8', 'ok'],
+      ['Creatinina', '1,8 mg/dL', '0,5 – 1,4', 'high'], ['BUN', '46 mg/dL', '10 – 30', 'high'],
+      ['Glucosa', '98 mg/dL', '70 – 120', 'ok'], ['ALT', '60 U/L', '10 – 100', 'ok'], ['ALP', '180 U/L', '20 – 150', 'high'] ] },
+    { name: 'Gases e iones', rows: [
+      ['Na⁺', '146 mEq/L', '140 – 150', 'ok'], ['K⁺', '4,4 mEq/L', '3,8 – 5,4', 'ok'],
+      ['Cl⁻', '110 mEq/L', '105 – 115', 'ok'], ['pH venoso', '7,38', '7,35 – 7,45', 'ok'], ['HCO₃⁻', '22 mmol/L', '18 – 26', 'ok'] ] },
+    { name: 'Orina', rows: [
+      ['Densidad urinaria', '1,008', '> 1,030', 'low'], ['Proteinuria', 'negativa', 'negativa', 'ok'],
+      ['Sedimento', 'sin cristales ni cilindros', 'normal', 'ok'] ] },
+    { name: 'Pruebas específicas', rows: [
+      ['PTH', '0,8 pmol/L', '2 – 13', 'low'], ['PTHrp', '8,2 pmol/L', '< 1,0', 'high'],
+      ['25-OH-vitamina D', '92 nmol/L', '60 – 215', 'ok'], ['Cortisol basal', '3,1 µg/dL', '> 2', 'ok'],
+      ['Citología de linfonodo', 'muestra en laboratorio (pendiente)', '—', 'ok'] ] }
+  ],
+  imaging: {
+    rx: { heart: 1.0, lungs: 'clean', cvc: 'normal', liver: 1.0, mediastinalMass: true, species: 'dog',
+      report: 'Masa de tejidos blandos en el mediastino craneal que desplaza la tráquea dorsalmente y borra el borde craneal de la silueta cardíaca. Linfonodo esternal aumentado. Sin evidencia de metástasis pulmonares.' },
+    us: { scene: 'spleen',
+      report: 'Esplenomegalia con parénquima heterogéneo, moteado hipoecoico ("queso suizo"). Linfonodos mesentéricos e ilíacos mediales aumentados e hipoecoicos. Corteza renal levemente hiperecogénica, compatible con nefrocalcinosis incipiente.' }
+  },
+  puzzles: {
+    patient: { type: 'mc', digit: '2',
+      q: '¿Qué hallazgo de la exploración reordena la lista de diagnósticos diferenciales de la PU/PD?',
+      opts: ['Linfadenomegalia generalizada indolora con esplenomegalia: sospecha de linfoma como causa de hipercalcemia',
+             'Bradicardia: sospecha de hipoadrenocorticismo',
+             'Deshidratación leve: sospecha de diabetes insípida central',
+             'Temblores musculares: sospecha de hipocalcemia'],
+      ok: 0, hint: 'Palpa los linfonodos y el bazo. ¿Qué causa de PU/PD tiene "bultos"?' },
+    monitor: { type: 'mc', digit: '9',
+      q: '¿Qué alteración identificas en el ECG y a qué alteración iónica corresponde?',
+      opts: ['Bradicardia con QT acortado: efecto de la hipercalcemia sobre el potencial de acción',
+             'Bradicardia con QT prolongado: hipocalcemia',
+             'Bloqueo AV completo con ritmo de escape ventricular',
+             'Bradicardia sinusal con ondas T picudas: hiperpotasemia'],
+      ok: 0, hint: 'Mide la distancia entre el QRS y el final de la onda T. ¿Está más cerca o más lejos de lo normal?' },
+    lab: { type: 'num', digit: '6', answer: 109.0, tol: 1.5, unit: '',
+      q: 'Calcula el producto calcio × fósforo (mg/dL × mg/dL) con el calcio total. Un valor > 70 se asocia a mineralización de tejidos blandos y a nefropatía hipercalcémica.',
+      hint: 'Calcio total 15,8 × fósforo 6,9.' },
+    imaging: { type: 'hot', digit: '1', mode: 'rx', x: 0.32, y: 0.47, r: 0.11,
+      q: 'Señala en la RADIOGRAFÍA la lesión que explica la elevación de PTHrp.',
+      hint: 'Busca una opacidad de tejidos blandos craneal al corazón que empuja la tráquea hacia arriba.' }
+  },
+  code: '2961',
+  diagnosis: {
+    q: 'Con todo lo recopilado, ¿cuál es tu diagnóstico?',
+    opts: [
+      { t: 'Hipercalcemia maligna humoral (PTHrp) por linfoma multicéntrico con masa mediastínica; nefropatía hipercalcémica incipiente', ok: true },
+      { t: 'Hiperparatiroidismo primario por adenoma paratiroideo', why: 'La PTH está suprimida (en el HPTP es normal-alta de forma inapropiada) y el fósforo estaría bajo, no alto. Tampoco explica la linfadenomegalia ni la masa mediastínica.' },
+      { t: 'Intoxicación por colecalciferol (rodenticida)', why: 'Sin exposición, 25-OH-vitamina D normal y PTHrp elevada. En la intoxicación por colecalciferol la PTHrp es baja.' },
+      { t: 'Hipoadrenocorticismo', why: 'Na⁺/K⁺ normales, cortisol basal > 2 µg/dL. La hipercalcemia del Addison es leve y no explica los ganglios ni la masa mediastínica.' },
+      { t: 'Enfermedad renal crónica con hiperparatiroidismo secundario', why: 'En la ERC el calcio ionizado suele ser normal o bajo con PTH elevada. Aquí el iCa es alto y la PTH está suprimida.' }
+    ] },
+  treatment: {
+    q: 'Selecciona el plan terapéutico correcto.',
+    opts: [
+      { t: 'Rehidratar con NaCl 0,9 % y mantener a 2-3× mantenimiento; después furosemida 2 mg/kg/8-12 h; PAAF/biopsia de linfonodo con inmunofenotipo ANTES de cualquier corticoide; estadificación y quimioterapia (protocolo CHOP) una vez confirmado', ok: true },
+      { t: 'Prednisolona 2 mg/kg/día de inmediato para bajar el calcio', why: 'Los glucocorticoides son linfocitolíticos: bajan el calcio, pero destruyen la muestra diagnóstica (falsos negativos en citología e inmunofenotipo) y seleccionan resistencia a la quimioterapia.' },
+      { t: 'Ringer lactato + pamidronato IV inmediato', why: 'El Ringer lactato aporta calcio. Los bifosfonatos son el segundo escalón cuando fluidos + furosemida no bastan, no la primera línea en un paciente deshidratado.' },
+      { t: 'Calcitonina + calcitriol + dieta rica en fósforo', why: 'El calcitriol y el fósforo agravan la hipercalcemia y la mineralización. La calcitonina es un rescate de efecto corto y con taquifilaxia.' },
+      { t: 'Furosemida antes de rehidratar + restricción hídrica', why: 'La furosemida sin rehidratación previa reduce el filtrado glomerular y empeora la hipercalcemia y la azotemia.' }
+    ] },
+  debrief: `
+    <p><strong>Diagnóstico final:</strong> hipercalcemia maligna humoral por linfoma multicéntrico (probable inmunofenotipo T, el más asociado a hipercalcemia y a masa mediastínica) con nefropatía hipercalcémica incipiente.</p>
+    <h4>Claves que resolvían el caso</h4>
+    <ul>
+      <li><strong>PU/PD con densidad 1,008</strong>: la hipercalcemia antagoniza la ADH en el túbulo colector (diabetes insípida nefrogénica adquirida).</li>
+      <li><strong>Ca ionizado alto + PTH suprimida + PTHrp alta</strong>: la tríada bioquímica de la hipercalcemia maligna humoral.</li>
+      <li><strong>Fósforo alto con Ca alto</strong>: producto Ca × P de 109 → riesgo de mineralización renal; en el HPTP el fósforo suele estar bajo.</li>
+      <li><strong>QT corto y bradicardia</strong>: el calcio acorta la fase 2 del potencial de acción.</li>
+      <li><strong>Masa mediastínica craneal + linfadenomegalia generalizada</strong>: linfoma hasta que se demuestre lo contrario.</li>
+    </ul>
+    <h4>Por qué el tratamiento</h4>
+    <p>El NaCl 0,9 % rehidrata, aumenta la calciuresis (el sodio compite con el calcio en el asa de Henle) y no aporta calcio. La furosemida sólo tiene sentido con el paciente hidratado. El corticoide antes de la citología es el error clásico: "trata" la analítica y arruina el diagnóstico.</p>
+    <h4>Después de escapar de la sala</h4>
+    <p>Citología + inmunofenotipo (citometría de flujo o PARR), estadificación (Estadio V si hay infiltración de médula/sangre; subestadio b por síntomas). El linfoma T hipercalcémico tiene peor pronóstico que el B; aun así, con CHOP se logran remisiones en la mayoría y medianas de supervivencia de 6-9 meses (mejor si es B).</p>`
+},
+/* ------------------------------------------------------------------ */
+{
+  id: 'ahim',
+  n: 4,
+  system: 'Hematología · Inmunología',
+  species: 'dog',
+  difficulty: 2,
+  title: 'Palidez, ictericia y orina oscura',
+  patient: 'Luna',
+  signalment: 'Perro · Cocker Spaniel · hembra esterilizada · 5 años · 13 kg',
+  history: 'Cuatro días de letargia progresiva, anorexia y taquipnea al mínimo esfuerzo. Ayer la orina era de color "té oscuro". Vive en una zona rural de Lugo; última desparasitación externa hace 4 meses, con garrapatas ocasionales. Sin acceso a cebollas, zinc ni fármacos. Vacunada hace 3 semanas.',
+  vitals: [
+    ['FC', '170 lpm', 'bad'], ['FR', '48 rpm', 'bad'], ['Tª', '39,4 ºC', 'warn'],
+    ['PAS Doppler', '110 mmHg', 'ok'], ['TRC', '2,5 s', 'warn'], ['SpO₂', '98 %', 'ok'],
+    ['Mucosas', 'pálidas e ictéricas', 'bad'], ['Pulso', 'hipercinético', 'warn']
+  ],
+  monitor: { hr: 170, spo2: 98, bp: '110/70', map: 83, rr: 48, temp: 39.4 },
+  exam: [
+    ['Cabeza y mucosas', 'Mucosas pálidas con tinte ictérico. Escleras ictéricas. TRC 2,5 s.'],
+    ['Auscultación', 'Taquicardia con soplo sistólico suave (II/VI) izquierdo, de tipo funcional. Pulmones limpios.'],
+    ['Abdomen', 'Esplenomegalia moderada, lisa, no dolorosa. Hepatomegalia leve.'],
+    ['Extremidades y pulso', 'Pulso hipercinético. Sin garrapatas en este momento. Extremidades templadas.'],
+    ['Piel y linfonodos', 'Sin petequias ni equimosis. Linfonodos normales.'],
+    ['Neurológico', 'Sin alteraciones.']
+  ],
+  ecg: { rate: 170, rAmp: 0.85, pAmp: 0.1, tAmp: 0.45, st: -0.16,
+    desc: 'Taquicardia sinusal a 170 lpm con depresión del segmento ST (≈ 0,2 mV) y ondas T de mayor amplitud. QRS de morfología normal.' },
+  lab: [
+    { name: 'Hemograma', rows: [
+      ['Hematocrito', '14 %', '37 – 55', 'low'], ['Hemoglobina', '4,6 g/dL', '12 – 18', 'low'],
+      ['Eritrocitos', '2,1 ×10⁶/µL', '5,5 – 8,5', 'low'], ['VCM', '78 fL', '60 – 77', 'high'],
+      ['CHCM', '31 g/dL', '32 – 36', 'low'], ['Reticulocitos', '12 %', '< 1', 'high'],
+      ['Plaquetas', '245 ×10³/µL', '200 – 500', 'ok'], ['Leucocitos', '32 ×10³/µL', '6 – 17', 'high'],
+      ['Neutrófilos', '26 ×10³/µL con desviación a la izquierda', '3 – 11,5', 'high'],
+      ['Frotis', 'esferocitos abundantes, policromasia, anisocitosis; autoaglutinación macroscópica que persiste tras lavado con salino', 'normal', 'high'] ] },
+    { name: 'Bioquímica', rows: [
+      ['Bilirrubina total', '3,6 mg/dL', '0 – 0,4', 'high'], ['ALT', '145 U/L', '10 – 100', 'high'],
+      ['ALP', '380 U/L', '20 – 150', 'high'], ['Albúmina', '2,9 g/dL', '2,6 – 3,8', 'ok'],
+      ['Proteínas totales', '6,8 g/dL', '5,5 – 7,5', 'ok'], ['Creatinina', '0,9 mg/dL', '0,5 – 1,4', 'ok'],
+      ['BUN', '22 mg/dL', '10 – 30', 'ok'], ['Glucosa', '105 mg/dL', '70 – 120', 'ok'] ] },
+    { name: 'Coagulación', rows: [
+      ['PT', '8 s', '6 – 10', 'ok'], ['aPTT', '14 s', '10 – 18', 'ok'],
+      ['Fibrinógeno', '480 mg/dL', '150 – 400', 'high'], ['Dímero D', '1,2 µg/mL', '< 0,5', 'high'],
+      ['Antitrombina', '68 %', '> 80', 'low'] ] },
+    { name: 'Orina', rows: [
+      ['Color', 'marrón oscuro', 'amarillo', 'high'], ['Densidad urinaria', '1,030', '> 1,030', 'ok'],
+      ['Hemoglobina (tira)', '+++', 'negativa', 'high'], ['Eritrocitos en sedimento', '0 – 1 / campo', '< 5', 'ok'],
+      ['Bilirrubinuria', '++', 'negativa / traza', 'high'] ] },
+    { name: 'Pruebas específicas', rows: [
+      ['Coombs directo', 'positivo 1:64', 'negativo', 'high'], ['SNAP 4Dx Plus', 'negativo', 'negativo', 'ok'],
+      ['PCR Babesia spp.', 'enviada', '—', 'ok'], ['Cross-match mayor (donante DEA 1 negativo)', 'compatible', 'compatible', 'ok'] ] }
+  ],
+  imaging: {
+    rx: { heart: 1.0, lungs: 'clean', cvc: 'normal', liver: 1.05, species: 'dog',
+      report: 'Sin alteraciones significativas. Silueta cardíaca normal, campos pulmonares limpios. Sin evidencia de masas ni metástasis (cribado de una causa secundaria de hemólisis).' },
+    us: { scene: 'spleen-homogeneous',
+      report: 'Esplenomegalia difusa y homogénea (hiperplasia reactiva / hemólisis extravascular). Hígado de ecogenicidad normal. Sin masas ni líquido libre.' },
+    smear: { report: 'Frotis de sangre periférica (×100): anisocitosis marcada con policromasia; abundantes esferocitos (eritrocitos pequeños, densos, sin palidez central); grumos de aglutinación; un neutrófilo en banda. Sin piroplasmas ni cuerpos de Heinz en el examen.' }
+  },
+  puzzles: {
+    patient: { type: 'mc', digit: '5',
+      q: '¿Qué prueba inmediata, a pie de jaula, realizas antes de nada?',
+      opts: ['Test de autoaglutinación en portaobjetos con salino (1:4) y frotis para buscar esferocitos; Hto/PT y color del plasma',
+             'Tiempo de sangrado de la mucosa bucal',
+             'Test de estimulación con ACTH',
+             'Ecocardiografía completa por el soplo'],
+      ok: 0, hint: 'Palidez + ictericia + orina oscura: la respuesta cuesta un portaobjetos y una gota de salino.' },
+    monitor: { type: 'mc', digit: '0',
+      q: '¿Qué muestra el monitor y cuál es su causa más probable?',
+      opts: ['Taquicardia sinusal con depresión del ST: hipoxia miocárdica secundaria a anemia grave',
+             'Taquicardia supraventricular por vía accesoria',
+             'Ritmo idioventricular acelerado por daño miocárdico traumático',
+             'Fibrilación auricular con respuesta ventricular rápida'],
+      ok: 0, hint: 'Hay onda P antes de cada QRS y el ritmo es regular. Mira el segmento entre el QRS y la T.' },
+    lab: { type: 'num', digit: '4', answer: 3.73, tol: 0.2, unit: '%',
+      q: 'Calcula el porcentaje de reticulocitos corregido: reticulocitos (%) × Hto del paciente ÷ Hto normal (45 % en el perro). Un decimal.',
+      hint: '12 × 14 ÷ 45.' },
+    imaging: { type: 'hot', digit: '7', mode: 'smear', x: 0.62, y: 0.42, r: 0.13,
+      q: 'Señala en el FROTIS un grupo de esferocitos (eritrocitos pequeños, densos y sin palidez central).',
+      hint: 'Busca las células más pequeñas y más oscuras, sin el "agujero" claro central de los eritrocitos normales.' }
+  },
+  code: '5047',
+  diagnosis: {
+    q: 'Con todo lo recopilado, ¿cuál es tu diagnóstico?',
+    opts: [
+      { t: 'Anemia hemolítica inmunomediada (AHIM) no asociativa, regenerativa, con hemólisis intra y extravascular y estado de hipercoagulabilidad', ok: true },
+      { t: 'Babesiosis canina', why: 'Es un diferencial real en Galicia y la PCR está enviada, pero el frotis no muestra piroplasmas y la esferocitosis marcada con autoaglutinación persistente y Coombs positivo apunta a AHIM primaria. La conducta prudente es cubrir con doxiciclina hasta el resultado.' },
+      { t: 'Anemia por cuerpos de Heinz (cebolla / zinc)', why: 'Sin exposición, sin cuerpos de Heinz ni excentrocitos en el frotis. La autoaglutinación no aparece en la hemólisis oxidativa.' },
+      { t: 'Hemorragia interna por hemangiosarcoma esplénico', why: 'La hemorragia aguda cursa sin ictericia ni hemoglobinuria, con proteínas totales bajas y sin esferocitos. La ecografía no muestra masa ni hemoabdomen.' },
+      { t: 'Shunt portosistémico con anemia microcítica', why: 'La anemia del shunt es leve, microcítica y no regenerativa; aquí hay hemólisis franca con VCM alto por reticulocitos.' }
+    ] },
+  treatment: {
+    q: 'Selecciona el plan terapéutico correcto.',
+    opts: [
+      { t: 'Prednisolona 2 mg/kg/día (o dexametasona IV equivalente si no tolera la vía oral), transfusión de concentrado de eritrocitos compatible tras cross-match, tromboprofilaxis (clopidogrel 2-3 mg/kg/día ± heparina de bajo peso molecular), gastroprotección y doxiciclina empírica hasta el resultado de la PCR de Babesia', ok: true },
+      { t: 'Hierro dextrano IM + vitamina B12 + eritropoyetina', why: 'No hay carencia: la médula ya responde (anemia regenerativa). Retrasar la inmunosupresión y la transfusión pone en riesgo la vida.' },
+      { t: 'Esplenectomía urgente', why: 'Es una opción para casos refractarios crónicos, no un tratamiento de urgencia. La cirugía en un paciente anémico y protrombótico añade mortalidad.' },
+      { t: 'Sangre entera de un perro no tipificado + dexametasona 1 mg/kg + ácido tranexámico', why: 'Transfundir sin tipificar ni cross-match a un perro con anticuerpos circulantes aumenta el riesgo de reacción. El ácido tranexámico es antifibrinolítico en un paciente con alto riesgo tromboembólico.' },
+      { t: 'Ciclosporina en monoterapia + ceftriaxona IV', why: 'La ciclosporina tarda semanas en actuar y no sustituye al glucocorticoide inicial. No hay indicación de cefalosporinas.' }
+    ] },
+  debrief: `
+    <p><strong>Diagnóstico final:</strong> anemia hemolítica inmunomediada no asociativa (primaria), regenerativa, con componente intravascular (hemoglobinuria) y extravascular (esferocitos, esplenomegalia), en estado protrombótico.</p>
+    <h4>Claves que resolvían el caso</h4>
+    <ul>
+      <li><strong>Autoaglutinación persistente tras lavado</strong> o <strong>esferocitosis marcada</strong> + anemia con signos de hemólisis: criterios diagnósticos del consenso ACVIM (2019).</li>
+      <li><strong>Reticulocitos corregidos 3,7 %</strong>: regeneración adecuada (> 1 %); si no hubiera respuesta tras 5 días pensaríamos en anemia no regenerativa inmunomediada (precursor-directed).</li>
+      <li><strong>Hemoglobinuria sin hematuria</strong>: hemólisis intravascular; peor pronóstico.</li>
+      <li><strong>Dímero D alto, antitrombina baja</strong>: el tromboembolismo pulmonar es la primera causa de muerte en la AHIM.</li>
+      <li><strong>Depresión del ST</strong>: hipoxia miocárdica; la transfusión es también una medida "cardíaca".</li>
+    </ul>
+    <h4>Por qué el tratamiento</h4>
+    <p>Glucocorticoide a dosis inmunosupresora como base; segundo inmunosupresor (micofenolato, ciclosporina, azatioprina) si no hay respuesta en 7 días o si la hemólisis es grave. Tromboprofilaxis desde el día 1. Transfundir por signos clínicos, no por una cifra. La vacunación reciente y las garrapatas obligan a buscar desencadenantes, pero no cambian el tratamiento inicial.</p>
+    <h4>Después de escapar de la sala</h4>
+    <p>Hto cada 12-24 h los primeros días; reducir el corticoide un 25 % cada 3-4 semanas una vez estable durante al menos 2 semanas; mantener el antitrombótico mientras dure la inmunosupresión. Mortalidad del 30-50 % el primer mes en las series clásicas; la mayoría de las muertes son tromboembólicas.</p>`
+},
+/* ------------------------------------------------------------------ */
+{
+  id: 'hipertiroidismo',
+  n: 5,
+  system: 'Endocrinología · Cardiología felina',
+  species: 'cat',
+  difficulty: 3,
+  title: 'Gata mayor con paresia aguda y disnea',
+  patient: 'Mimi',
+  signalment: 'Gato · Común Europeo · hembra esterilizada · 14 años · 3,1 kg',
+  history: 'Desde hace 4 meses: pérdida de peso (de 4,4 a 3,1 kg) a pesar de comer con voracidad, vómitos frecuentes, hiperactividad y vocalización nocturna. Hace 2 horas: grito súbito, incapacidad para mover las extremidades posteriores y respiración con la boca abierta.',
+  vitals: [
+    ['FC', '240 lpm', 'bad'], ['FR', '60 rpm, esfuerzo', 'bad'], ['Tª', '37,2 ºC', 'warn'],
+    ['PAS Doppler (MA)', '175 mmHg', 'bad'], ['TRC', '2 s', 'ok'], ['SpO₂', '90 %', 'bad'],
+    ['Mucosas', 'rosadas, cianosis periférica', 'warn'], ['Pulso femoral', 'ausente bilateral', 'bad']
+  ],
+  monitor: { hr: 240, spo2: 90, bp: '175/110', map: 132, rr: 60, temp: 37.2 },
+  exam: [
+    ['Cabeza y mucosas', 'Mucosas rosadas con ligera cianosis periférica. Nódulo tiroideo palpable en la cara ventral izquierda del cuello (≈ 1 cm). Pelo sin acicalar, seborreico.'],
+    ['Auscultación', 'Taquicardia a 240 lpm con ritmo de galope y soplo sistólico III/VI paraesternal izquierdo. Crepitaciones bilaterales; ruidos disminuidos ventralmente.'],
+    ['Abdomen', 'Riñones pequeños e irregulares. Sin dolor. Vejiga moderadamente llena.'],
+    ['Extremidades y pulso', 'Ausencia de pulso femoral bilateral; almohadillas plantares frías y cianóticas; músculos gastrocnemios duros y dolorosos. Miembros anteriores normales.'],
+    ['Piel y linfonodos', 'Condición corporal 2/9 con pérdida de masa muscular. Pelaje descuidado.'],
+    ['Neurológico', 'Paresia/plejia flácida de miembros posteriores con dolor intenso; reflejos posteriores ausentes, nocicepción reducida.']
+  ],
+  ecg: { rate: 240, rAmp: 1.25, pAmp: 0.08, tAmp: 0.25, cat: true, pvcEvery: 6,
+    desc: 'Taquicardia sinusal a 240 lpm con complejos QRS de voltaje aumentado (R > 0,9 mV en DII, sugerente de aumento del ventrículo izquierdo) y complejos ventriculares prematuros aislados.' },
+  lab: [
+    { name: 'Hemograma', rows: [
+      ['Hematocrito', '38 %', '30 – 45', 'ok'], ['Leucocitos', '14 ×10³/µL (linfopenia de estrés)', '5,5 – 19,5', 'ok'],
+      ['Plaquetas', '320 ×10³/µL', '300 – 700', 'ok'] ] },
+    { name: 'Bioquímica', rows: [
+      ['T4 total', '9,8 µg/dL', '0,8 – 4,0', 'high'], ['ALT', '186 U/L', '20 – 100', 'high'],
+      ['ALP', '210 U/L', '10 – 90', 'high'], ['Creatinina', '1,1 mg/dL', '0,8 – 2,0', 'ok'],
+      ['SDMA', '12 µg/dL', '< 14', 'ok'], ['BUN', '32 mg/dL', '15 – 35', 'ok'],
+      ['Fósforo', '4,8 mg/dL', '2,5 – 6,0', 'ok'], ['Glucosa (sistémica, yugular)', '180 mg/dL', '70 – 150', 'high'],
+      ['Glucosa (extremidad afectada, almohadilla)', '96 mg/dL', '—', 'ok'],
+      ['CK', '14.200 U/L', '< 400', 'high'], ['Troponina I', '2,4 ng/mL', '< 0,1', 'high'],
+      ['NT-proBNP', '> 1.500 pmol/L', '< 100', 'high'], ['Fructosamina', '260 µmol/L', '190 – 365', 'ok'] ] },
+    { name: 'Gases e iones', rows: [
+      ['pH venoso', '7,31', '7,33 – 7,43', 'low'], ['HCO₃⁻', '17 mmol/L', '18 – 24', 'low'],
+      ['K⁺', '4,2 mEq/L', '3,5 – 5,5', 'ok'], ['Na⁺', '152 mEq/L', '145 – 158', 'ok'],
+      ['Lactato sistémico', '2,1 mmol/L', '< 2,5', 'ok'], ['Lactato extremidad afectada', '8,4 mmol/L', '< 2,5', 'high'] ] },
+    { name: 'Orina', rows: [
+      ['Densidad urinaria', '1,020', '> 1,035', 'low'], ['Glucosuria', 'negativa', 'negativa', 'ok'],
+      ['Proteinuria', '+', 'negativa', 'high'], ['Sedimento', 'sin alteraciones', 'normal', 'ok'] ] }
+  ],
+  imaging: {
+    rx: { heart: 1.45, lungs: 'edema', cvc: 'normal', liver: 1.0, pleural: true, species: 'cat',
+      report: 'Cardiomegalia generalizada (VHS 9,5 v) con aurícula izquierda prominente. Patrón alveolar parcheado perihiliar y en lóbulos caudales, compatible con edema pulmonar cardiogénico. Líneas de fisura y ligera retracción de los lóbulos: efusión pleural escasa.' },
+    us: { scene: 'echo-hcm',
+      report: 'Ecocardiografía: hipertrofia concéntrica del ventrículo izquierdo (septo 7,5 mm, pared libre 7,1 mm en diástole), aurícula izquierda muy dilatada (AI/Ao 2,3) con contraste espontáneo ("humo") y trombo laminar en la orejuela izquierda. Movimiento sistólico anterior de la mitral. Efusión pleural escasa.' }
+  },
+  puzzles: {
+    patient: { type: 'mc', digit: '9',
+      q: '¿Qué combinación de hallazgos apoya un tromboembolismo aórtico frente a una lesión medular aguda?',
+      opts: ['Ausencia de pulso femoral + almohadillas frías y cianóticas + gastrocnemios duros y dolorosos (las "5 P")',
+             'Reflejos espinales ausentes + dolor lumbar',
+             'Cianosis + crepitaciones pulmonares',
+             'Nódulo tiroideo + taquicardia'],
+      ok: 0, hint: 'Pain, Pulselessness, Pallor, Paralysis, Poikilothermia. Todo lo que es vascular, no neurológico.' },
+    monitor: { type: 'mc', digit: '6',
+      q: '¿Qué muestra el ECG?',
+      opts: ['Taquicardia sinusal con R de alto voltaje y extrasístoles ventriculares: aumento del VI y miocardio irritable (hipertiroidismo / cardiomiopatía)',
+             'Bloqueo de rama izquierda con bradicardia',
+             'Fibrilación auricular: dilatación auricular masiva',
+             'Ritmo sinusal normal para un gato estresado'],
+      ok: 0, hint: 'El ritmo de base es regular, con P, pero cada pocos latidos aparece un complejo ancho y distinto. Y las R son muy altas para un gato.' },
+    lab: { type: 'num', digit: '3', answer: 84, tol: 1.5, unit: 'mg/dL',
+      q: 'Calcula la diferencia de glucemia entre la muestra sistémica y la de la extremidad afectada (mg/dL). Una diferencia > 30 mg/dL apoya el diagnóstico de tromboembolismo aórtico.',
+      hint: 'Glucosa yugular 180 − glucosa de la almohadilla 96.' },
+    imaging: { type: 'hot', digit: '8', mode: 'us', x: 0.64, y: 0.60, r: 0.13,
+      q: 'Señala en el ECOCARDIOGRAMA la cámara dilatada con contraste espontáneo ("humo"), origen del trombo.',
+      hint: 'La aurícula izquierda es la cámara grande y redondeada de la parte inferior derecha de la imagen, con un interior "brumoso".' }
+  },
+  code: '9638',
+  diagnosis: {
+    q: 'Con todo lo recopilado, ¿cuál es tu diagnóstico?',
+    opts: [
+      { t: 'Hipertiroidismo con cardiomiopatía hipertrófica secundaria (tirotóxica), insuficiencia cardíaca congestiva (edema + efusión) y tromboembolismo aórtico distal', ok: true },
+      { t: 'Cardiomiopatía hipertrófica primaria sin endocrinopatía', why: 'La T4 total de 9,8 µg/dL con nódulo palpable, polifagia con pérdida de peso e hiperactividad confirman el hipertiroidismo. Parte de la hipertrofia puede revertir al controlarlo.' },
+      { t: 'Hernia discal toracolumbar aguda', why: 'Los pulsos ausentes, las almohadillas frías y el gradiente de glucosa/lactato entre extremidad y sistema son vasculares, no medulares.' },
+      { t: 'Diabetes mellitus con neuropatía diabética', why: 'La glucemia de 180 es hiperglucemia de estrés (fructosamina normal, sin glucosuria). La neuropatía diabética es crónica, plantígrada e indolora.' },
+      { t: 'Linfoma alimentario con caquexia', why: 'No explica el nódulo tiroideo, la T4 elevada ni el cuadro cardiovascular agudo.' }
+    ] },
+  treatment: {
+    q: 'Selecciona el plan terapéutico correcto.',
+    opts: [
+      { t: 'Oxígeno, analgesia opioide (metadona 0,2-0,3 mg/kg IV o buprenorfina), furosemida 1-2 mg/kg IV por el edema, clopidogrel 18,75 mg/gato/24 h ± enoxaparina, sin fluidoterapia IV; metimazol 2,5 mg/12 h una vez estable y revaluar creatinina y presión arterial tras el control tiroideo', ok: true },
+      { t: 'Fluidoterapia a 60 mL/kg/día + meloxicam 0,1 mg/kg', why: 'Los fluidos en insuficiencia cardíaca congestiva agravan el edema. Los AINE están contraindicados con hipoperfusión renal y una ERC probablemente enmascarada por el hipertiroidismo.' },
+      { t: 'Estreptoquinasa / tPA sistémico + heparina en bolo', why: 'La trombólisis en el TEA felino no mejora la supervivencia y produce hiperpotasemia por reperfusión y hemorragias.' },
+      { t: 'Amputación bilateral urgente', why: 'Sin indicación: muchos gatos recuperan función motora parcial en días o semanas. Primero estabilizar y valorar la viabilidad tisular.' },
+      { t: 'Yodo radiactivo urgente + atenolol 6,25 mg/12 h + toracocentesis', why: 'El I-131 es un tratamiento definitivo programado, no de urgencia. El betabloqueante en ICC descompensada puede deprimir la contractilidad; la toracocentesis sólo si la efusión es significativa.' }
+    ] },
+  debrief: `
+    <p><strong>Diagnóstico final:</strong> hipertiroidismo con cardiomiopatía hipertrófica tirotóxica, insuficiencia cardíaca congestiva y tromboembolismo aórtico (TEA) en silla de montar.</p>
+    <h4>Claves que resolvían el caso</h4>
+    <ul>
+      <li><strong>Las 5 P</strong> (pain, pulselessness, pallor, paralysis, poikilothermia) y los <strong>gastrocnemios duros</strong>: TEA hasta que se demuestre lo contrario. Diferencia de glucosa de 84 mg/dL y de lactato de 6,3 mmol/L entre extremidad y sistema: pruebas a pie de jaula con buena sensibilidad.</li>
+      <li><strong>Galope + soplo + crepitaciones + NT-proBNP</strong>: insuficiencia cardíaca congestiva izquierda.</li>
+      <li><strong>Aurícula izquierda con "humo"</strong>: estasis sanguínea; es el hallazgo ecocardiográfico que más predice el TEA.</li>
+      <li><strong>T4 alta con nódulo palpable</strong>: hipertiroidismo, que además enmascara una ERC (creatinina "normal" con riñones pequeños e irregulares y densidad 1,020).</li>
+      <li><strong>R altas y extrasístoles ventriculares</strong>: hipertrofia y miocardio irritable por el exceso de hormona tiroidea.</li>
+    </ul>
+    <h4>Por qué el tratamiento</h4>
+    <p>Analgesia primero: el TEA es una de las urgencias más dolorosas de la clínica felina. Diurético y oxígeno para el edema; sin fluidos. Antiagregación (clopidogrel, superior a la aspirina en el estudio FAT CAT) ± anticoagulación para evitar la extensión y la recurrencia. El metimazol se inicia una vez controlada la urgencia, con control renal a las 2-4 semanas.</p>
+    <h4>Después de escapar de la sala</h4>
+    <p>El pronóstico depende de la afectación (bilateral, sin motricidad, hipotermia < 37 ºC e ICC son factores negativos); la mediana de supervivencia tras el alta ronda los 3-6 meses, y mejora si se controla la cardiopatía y se mantiene el clopidogrel. Cuando la ERC esté desenmascarada, ajustar el objetivo de T4 y valorar el I-131 si la función renal lo permite.</p>`
+}
+];
+/* =====================================================================
+   UTILIDADES, ICONOS Y AUDIO
+   ===================================================================== */
+const ICONS = {
+  paw: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5.5" cy="9" r="2.2"/><circle cx="18.5" cy="9" r="2.2"/><circle cx="9" cy="5" r="2.3"/><circle cx="15" cy="5" r="2.3"/><path d="M12 9.5c-3.2 0-6.2 3.2-6.2 6.2 0 2 1.4 3.3 3.2 3.3 1.1 0 1.9-.6 3-.6s1.9.6 3 .6c1.8 0 3.2-1.3 3.2-3.3 0-3-3-6.2-6.2-6.2z"/></svg>',
+  heart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/><path d="M3.5 12h4l1.5-3 3 6 1.5-3h4"/></svg>',
+  flask: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6"/><path d="M10 3v6.5L4.5 19a2 2 0 0 0 1.7 3h11.6a2 2 0 0 0 1.7-3L14 9.5V3"/><path d="M7 15h10"/></svg>',
+  xray: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 6v12M8 9h8M8 12h8M8 15h8"/></svg>',
+  lock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1.3"/></svg>',
+  eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 12S5.5 5 12 5s10.5 7 10.5 7-4 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+  menu: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>',
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9.5"/></svg>',
+  alert: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l10 18H2L12 3z"/><path d="M12 10v5M12 18h.01"/></svg>',
+  trophy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10v4a5 5 0 0 1-10 0V4z"/><path d="M7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4"/><path d="M12 13v4M8 21h8M9 17h6"/></svg>',
+  bulb: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.5 1 2.5h6c0-1 .3-1.8 1-2.5A6 6 0 0 0 12 3z"/></svg>'
+};
+function applyIcons(root) {
+  (root || document).querySelectorAll('[data-icon]').forEach(el => {
+    const svg = ICONS[el.getAttribute('data-icon')];
+    if (svg) { el.innerHTML = svg; el.style.display = el.style.display || 'inline-flex'; if (!el.style.width) { el.style.width = '16px'; el.style.height = '16px'; } }
+  });
+}
+const $ = id => document.getElementById(id);
+function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const gauss = (t, c, w) => Math.exp(-((t - c) * (t - c)) / (2 * w * w));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const fmtTime = s => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+
+let audioCtx = null;
+function playSound(type) {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const now = audioCtx.currentTime;
+    const tone = (f0, f1, dur, vol, kind) => {
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type = kind || 'sine'; o.connect(g); g.connect(audioCtx.destination);
+      o.frequency.setValueAtTime(f0, now); if (f1) o.frequency.exponentialRampToValueAtTime(f1, now + dur);
+      g.gain.setValueAtTime(vol, now); g.gain.exponentialRampToValueAtTime(0.0008, now + dur);
+      o.start(now); o.stop(now + dur);
+    };
+    if (type === 'beep') tone(880, 0, 0.07, 0.06);
+    else if (type === 'ok') { tone(523, 0, 0.12, 0.09, 'triangle'); setTimeout(() => tone(784, 0, 0.18, 0.09, 'triangle'), 110); }
+    else if (type === 'err') tone(160, 90, 0.28, 0.16, 'sawtooth');
+    else if (type === 'unlock') { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => tone(f, 0, 0.22, 0.1, 'triangle'), i * 90)); }
+    else if (type === 'fail') { tone(220, 60, 0.9, 0.18, 'sawtooth'); }
+    else if (type === 'tick') tone(1200, 0, 0.03, 0.03, 'square');
+    else if (type === 'frag') { tone(1047, 1568, 0.25, 0.08, 'sine'); }
+  } catch (e) { /* audio no disponible */ }
+}
+
+/* =====================================================================
+   ECG PARAMÉTRICO
+   ===================================================================== */
+const ECG = {
+  p: null, beatIdx: 0, beatStart: 0, t: 0, x: 0, lastY: null,
+  trace: document.createElement('canvas'), grid: document.createElement('canvas'),
+  set(params) {
+    this.p = Object.assign({ rate: 100, pAmp: .15, rAmp: 1, qAmp: .1, sAmp: .25, tAmp: .3, tWidth: .04, st: 0, qtShort: false, alternans: false, pvcEvery: 0, cat: false, peaked: false }, params);
+    this.beatIdx = 0; this.beatStart = 0; this.t = 0; this.x = 0; this.lastY = null;
+    const tc = this.trace.getContext('2d'); tc.clearRect(0, 0, this.trace.width, this.trace.height);
+  },
+  init(w, h) {
+    this.trace.width = w; this.trace.height = h; this.grid.width = w; this.grid.height = h;
+    const g = this.grid.getContext('2d');
+    g.fillStyle = '#03110b'; g.fillRect(0, 0, w, h);
+    g.strokeStyle = 'rgba(52,211,153,.08)'; g.lineWidth = 1;
+    for (let x = 0; x < w; x += 9) { g.beginPath(); g.moveTo(x + .5, 0); g.lineTo(x + .5, h); g.stroke(); }
+    for (let y = 0; y < h; y += 9) { g.beginPath(); g.moveTo(0, y + .5); g.lineTo(w, y + .5); g.stroke(); }
+    g.strokeStyle = 'rgba(52,211,153,.18)';
+    for (let x = 0; x < w; x += 45) { g.beginPath(); g.moveTo(x + .5, 0); g.lineTo(x + .5, h); g.stroke(); }
+    for (let y = 0; y < h; y += 45) { g.beginPath(); g.moveTo(0, y + .5); g.lineTo(w, y + .5); g.stroke(); }
+  },
+  beatDur(i) {
+    const p = this.p, base = 60 / p.rate;
+    if (p.pvcEvery) { const m = i % p.pvcEvery; if (m === p.pvcEvery - 1) return base * 0.62; if (m === 0 && i > 0) return base * 1.35; }
+    return base;
+  },
+  value(t) {
+    const p = this.p;
+    while (t - this.beatStart >= this.beatDur(this.beatIdx)) { this.beatStart += this.beatDur(this.beatIdx); this.beatIdx++; }
+    const tb = t - this.beatStart, i = this.beatIdx;
+    const isPVC = p.pvcEvery && (i % p.pvcEvery === p.pvcEvery - 1);
+    const P = p.cat ? .05 : .10, R = p.cat ? .10 : .20;
+    if (isPVC) {
+      return 1.5 * gauss(tb, R - .01, .02) - 1.0 * gauss(tb, R + .045, .022) - 0.45 * gauss(tb, R + .17, .05);
+    }
+    const qt = p.cat ? (p.qtShort ? .10 : .14) : (p.qtShort ? .13 : .21);
+    const T = R + qt;
+    let rAmp = p.rAmp; if (p.alternans) rAmp *= (i % 2 ? 1 : .55);
+    let v = p.pAmp * gauss(tb, P, .018) - p.qAmp * gauss(tb, R - .012, .006) + rAmp * gauss(tb, R, .007) - p.sAmp * gauss(tb, R + .014, .007);
+    v += p.tAmp * gauss(tb, T, p.peaked ? .022 : p.tWidth);
+    if (p.st) { const a = R + .03, b = T - .04; if (tb > a && tb < b) { const k = Math.min(1, (tb - a) / .02, (b - tb) / .02); v += p.st * k; } }
+    return v;
+  },
+  step(dt) {
+    if (!this.p) return;
+    const c = this.trace.getContext('2d'), w = this.trace.width, h = this.trace.height;
+    const pxs = 190, base = h * .62, scale = h * .38;
+    const steps = Math.max(1, Math.ceil(dt * pxs));
+    const sub = dt / steps;
+    c.strokeStyle = '#34d399'; c.lineWidth = 2.2; c.lineJoin = 'round'; c.shadowColor = 'rgba(52,211,153,.6)'; c.shadowBlur = 4;
+    for (let s = 0; s < steps; s++) {
+      this.t += sub;
+      const nx = this.x + sub * pxs;
+      const y = base - this.value(this.t) * scale;
+      if (nx >= w) { this.x = 0; this.lastY = null; continue; }
+      // borrar por delante (barra de barrido)
+      c.save(); c.shadowBlur = 0; c.drawImage(this.grid, nx, 0, 26, h, nx, 0, 26, h); c.restore();
+      if (this.lastY !== null) { c.beginPath(); c.moveTo(this.x, this.lastY); c.lineTo(nx, y); c.stroke(); }
+      this.x = nx; this.lastY = y;
+    }
+    c.shadowBlur = 0;
+  }
+};
+ECG.init(900, 150);
+
+/* =====================================================================
+   RADIOGRAFÍA TORÁCICA LATERAL (procedural)
+   ===================================================================== */
+function drawRX(ctx, W, H, p) {
+  const rnd = mulberry32(7);
+  ctx.save();
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+  const sx = W / 960, sy = H / 540; ctx.scale(sx, sy);
+  const cat = p.species === 'cat';
+  // cuerpo (tejidos blandos)
+  let g = ctx.createLinearGradient(0, 40, 0, 520); g.addColorStop(0, '#3d3d3d'); g.addColorStop(.5, '#4a4a4a'); g.addColorStop(1, '#333');
+  ctx.fillStyle = g; roundRect(ctx, 40, cat ? 90 : 60, 890, cat ? 380 : 450, 120); ctx.fill();
+  // tórax radiolúcido
+  const thx = { x0: 175, x1: 640, y0: cat ? 150 : 120, y1: cat ? 400 : 430 };
+  g = ctx.createRadialGradient(400, 280, 40, 400, 280, 330); g.addColorStop(0, '#151515'); g.addColorStop(1, '#262626');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse((thx.x0 + thx.x1) / 2 + 20, (thx.y0 + thx.y1) / 2, (thx.x1 - thx.x0) / 2 + 30, (thx.y1 - thx.y0) / 2 + 10, 0, 0, Math.PI * 2); ctx.fill();
+  // vasos pulmonares
+  ctx.strokeStyle = 'rgba(190,190,190,.22)'; ctx.lineWidth = 3;
+  for (let i = 0; i < 14; i++) { const a = -0.9 + i * 0.13; ctx.beginPath(); ctx.moveTo(400, 250); ctx.quadraticCurveTo(400 + Math.cos(a) * 120, 250 + Math.sin(a) * 120, 400 + Math.cos(a) * 240, 250 + Math.sin(a) * 200); ctx.lineWidth = 1.5 + rnd() * 2; ctx.stroke(); }
+  // diafragma y abdomen
+  g = ctx.createLinearGradient(600, 0, 930, 0); g.addColorStop(0, '#5a5a5a'); g.addColorStop(1, '#3f3f3f');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(640, 110); ctx.quadraticCurveTo(560, 280, 640, 470); ctx.lineTo(930, 470); ctx.lineTo(930, 110); ctx.closePath(); ctx.fill();
+  // hígado
+  ctx.fillStyle = 'rgba(120,120,120,.55)'; ctx.beginPath(); ctx.ellipse(690 + (p.liver - 1) * 60, 330, 70 * p.liver, 120 * p.liver, 0.1, 0, Math.PI * 2); ctx.fill();
+  // gas gástrico
+  ctx.fillStyle = '#0d0d0d'; ctx.beginPath(); ctx.ellipse(770 + (p.liver - 1) * 60, 300, 45, 30, -.3, 0, Math.PI * 2); ctx.fill();
+  // vena cava caudal
+  ctx.fillStyle = 'rgba(150,150,150,.5)'; const cvcW = p.cvc === 'wide' ? 40 : 22;
+  ctx.beginPath(); ctx.moveTo(470, 330 - cvcW / 2); ctx.lineTo(600, 320 - cvcW / 2); ctx.lineTo(600, 320 + cvcW / 2); ctx.lineTo(470, 330 + cvcW / 2); ctx.closePath(); ctx.fill();
+  // tráquea
+  const trY = p.mediastinalMass ? 150 : 185;
+  ctx.strokeStyle = '#0a0a0a'; ctx.lineWidth = 22; ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(90, 165); ctx.quadraticCurveTo(250, trY, 385, 240); ctx.stroke();
+  // masa mediastínica
+  if (p.mediastinalMass) {
+    g = ctx.createRadialGradient(307, 254, 10, 307, 254, 80); g.addColorStop(0, 'rgba(200,200,200,.85)'); g.addColorStop(1, 'rgba(160,160,160,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(307, 254, 85, 70, .2, 0, Math.PI * 2); ctx.fill();
+  }
+  // silueta cardíaca
+  const hx = 410, hy = cat ? 290 : 300, base = cat ? 78 : 92;
+  const rx = base * p.heart * (p.heart > 1.5 ? 1.25 : 1), ry = base * 1.32 * p.heart * (p.heart > 1.5 ? .95 : 1);
+  g = ctx.createRadialGradient(hx, hy, 10, hx, hy, Math.max(rx, ry)); g.addColorStop(0, '#8c8c8c'); g.addColorStop(.75, '#727272'); g.addColorStop(1, 'rgba(100,100,100,.45)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(hx, hy, rx, ry, cat ? .55 : .35, 0, Math.PI * 2); ctx.fill();
+  // patrones pulmonares
+  if (p.lungs === 'hemorrhage' || p.lungs === 'edema') {
+    const n = p.lungs === 'edema' ? 60 : 110;
+    for (let i = 0; i < n; i++) {
+      let cx, cy;
+      if (p.lungs === 'edema') { const k = rnd(); cx = (k < .5) ? 440 + rnd() * 110 : 480 + rnd() * 140; cy = 170 + rnd() * 150; }
+      else { cx = 250 + rnd() * 380; cy = 130 + rnd() * 250; if (cy > 330 && rnd() < .5) continue; }
+      const r = 12 + rnd() * (p.lungs === 'edema' ? 30 : 18);
+      g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r); g.addColorStop(0, `rgba(210,210,210,${p.lungs === 'edema' ? .35 : .22})`); g.addColorStop(1, 'rgba(210,210,210,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+    }
+    if (p.lungs === 'hemorrhage') { ctx.strokeStyle = 'rgba(200,200,200,.12)'; ctx.lineWidth = 1; for (let i = 0; i < 40; i++) { ctx.beginPath(); ctx.moveTo(250 + rnd() * 380, 130 + rnd() * 250); ctx.lineTo(250 + rnd() * 380, 130 + rnd() * 250); ctx.stroke(); } }
+  }
+  if (p.pleural) {
+    ctx.strokeStyle = 'rgba(220,220,220,.5)'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(300, 170); ctx.lineTo(330, 380); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(520, 190); ctx.lineTo(545, 390); ctx.stroke();
+    ctx.fillStyle = 'rgba(200,200,200,.35)'; ctx.beginPath(); ctx.moveTo(190, 380); ctx.quadraticCurveTo(400, 430, 630, 385); ctx.lineTo(630, 410); ctx.quadraticCurveTo(400, 455, 190, 405); ctx.closePath(); ctx.fill();
+  }
+  // costillas
+  ctx.lineCap = 'round';
+  for (let i = 0; i < 13; i++) {
+    const x0 = 180 + i * 37; ctx.strokeStyle = 'rgba(235,235,235,.55)'; ctx.lineWidth = 8;
+    ctx.beginPath(); ctx.moveTo(x0, thx.y0 - 15); ctx.bezierCurveTo(x0 - 75, thx.y0 + 70, x0 - 60, thx.y1 - 40, x0 + 30, thx.y1 + 15); ctx.stroke();
+    ctx.strokeStyle = 'rgba(120,120,120,.5)'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(x0, thx.y0 - 15); ctx.bezierCurveTo(x0 - 75, thx.y0 + 70, x0 - 60, thx.y1 - 40, x0 + 30, thx.y1 + 15); ctx.stroke();
+  }
+  // columna
+  for (let i = 0; i < 22; i++) {
+    const x = 60 + i * 41; ctx.fillStyle = 'rgba(245,245,245,.85)'; roundRect(ctx, x, (cat ? 118 : 88), 33, 26, 6); ctx.fill();
+    ctx.fillStyle = 'rgba(245,245,245,.6)'; ctx.beginPath(); ctx.moveTo(x + 8, cat ? 118 : 88); ctx.lineTo(x + 16, (cat ? 118 : 88) - 22); ctx.lineTo(x + 26, cat ? 118 : 88); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(60,60,60,.7)'; ctx.fillRect(x + 33, (cat ? 122 : 92), 8, 18);
+  }
+  // esternón
+  for (let i = 0; i < 8; i++) { ctx.fillStyle = 'rgba(240,240,240,.8)'; roundRect(ctx, 200 + i * 52, thx.y1 + 12, 42, 16, 6); ctx.fill(); }
+  // escápula / húmero
+  ctx.strokeStyle = 'rgba(235,235,235,.45)'; ctx.lineWidth = 18; ctx.beginPath(); ctx.moveTo(150, 130); ctx.lineTo(215, 300); ctx.stroke();
+  ctx.lineWidth = 14; ctx.beginPath(); ctx.moveTo(215, 300); ctx.lineTo(150, 470); ctx.stroke();
+  // grano y viñeta
+  ctx.restore();
+  const img = ctx.getImageData(0, 0, W, H), d = img.data; const r2 = mulberry32(99);
+  for (let i = 0; i < d.length; i += 4) { const n = (r2() - .5) * 18; d[i] += n; d[i + 1] += n; d[i + 2] += n; }
+  ctx.putImageData(img, 0, 0);
+  const vg = ctx.createRadialGradient(W / 2, H / 2, H * .3, W / 2, H / 2, H * .9); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.55)');
+  ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = 'rgba(255,255,255,.75)'; ctx.font = `bold ${Math.round(H * .05)}px monospace`; ctx.fillText('R', W * .05, H * .14);
+  ctx.font = `${Math.round(H * .028)}px monospace`; ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.fillText('LAT D · kVp 70 · mAs 5', W * .05, H * .95);
+}
+function roundRect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+
+/* =====================================================================
+   ECOGRAFÍA (procedural)
+   ===================================================================== */
+let speckleCanvas = null;
+function getSpeckle() {
+  if (speckleCanvas) return speckleCanvas;
+  const c = document.createElement('canvas'); c.width = 480; c.height = 270; const x = c.getContext('2d');
+  const img = x.createImageData(480, 270); const r = mulberry32(3);
+  for (let i = 0; i < img.data.length; i += 4) { const v = 60 + r() * 150; img.data[i] = img.data[i + 1] = img.data[i + 2] = v; img.data[i + 3] = 255; }
+  x.putImageData(img, 0, 0); speckleCanvas = c; return c;
+}
+function usFanPath(ctx, W, H) { const ax = W / 2, ay = -H * .12, R = H * 1.06, a0 = Math.PI / 2 - .78, a1 = Math.PI / 2 + .78; ctx.beginPath(); ctx.moveTo(ax + Math.cos(a0) * H * .06, ay + Math.sin(a0) * H * .06); ctx.arc(ax, ay, R, a0, a1); ctx.arc(ax, ay, H * .06, a1, a0, true); ctx.closePath(); }
+function usRegion(ctx, W, H, fn, echo, alpha) {
+  // echo 0 (anecoico) .. 1 (hiperecoico)
+  ctx.save(); fn(); ctx.clip();
+  const v = Math.round(10 + echo * 200);
+  ctx.globalAlpha = alpha == null ? 1 : alpha; ctx.fillStyle = `rgb(${v},${v},${v})`; ctx.fillRect(0, 0, W, H);
+  if (echo > .05) { ctx.globalAlpha = (alpha == null ? 1 : alpha) * .45; ctx.globalCompositeOperation = 'multiply'; ctx.drawImage(getSpeckle(), 0, 0, W, H); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = (alpha == null ? 1 : alpha) * .25 * echo; ctx.drawImage(getSpeckle(), 0, 0, W, H); }
+  ctx.restore();
+}
+function drawUS(ctx, W, H, scene, label) {
+  ctx.save(); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+  usFanPath(ctx, W, H); ctx.clip();
+  // fondo con speckle
+  ctx.fillStyle = '#3a3a3a'; ctx.fillRect(0, 0, W, H);
+  ctx.globalAlpha = .7; ctx.globalCompositeOperation = 'multiply'; ctx.drawImage(getSpeckle(), 0, 0, W, H); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+  const E = (x, y, rx, ry, rot) => () => { ctx.beginPath(); ctx.ellipse(x * W, y * H, rx * W, ry * H, rot || 0, 0, Math.PI * 2); };
+  if (scene === 'pericardial') {
+    usRegion(ctx, W, H, E(.5, .55, .30, .33), .02);            // efusión anecoica
+    usRegion(ctx, W, H, E(.49, .56, .19, .22, -.15), .55);     // miocardio
+    usRegion(ctx, W, H, E(.43, .58, .085, .11), .05);          // VI
+    usRegion(ctx, W, H, E(.585, .45, .06, .06), .06);          // VD/AD colapsada
+    usRegion(ctx, W, H, E(.55, .66, .05, .045), .05);          // AI
+    // masa heterogénea en AD
+    usRegion(ctx, W, H, E(.71, .39, .07, .085, .3), .5);
+    const r = mulberry32(11); for (let i = 0; i < 14; i++) usRegion(ctx, W, H, E(.71 + (r() - .5) * .09, .39 + (r() - .5) * .11, .015 + r() * .012, .015 + r() * .015), r() < .5 ? .1 : .85);
+    usRegion(ctx, W, H, E(.5, .55, .30, .33), .9, .12);        // pericardio (línea)
+    ctx.strokeStyle = 'rgba(230,230,230,.7)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(.5 * W, .55 * H, .30 * W, .33 * H, 0, 0, Math.PI * 2); ctx.stroke();
+    usText(ctx, W, H, [['VI', .40, .59], ['VD', .575, .45], ['AI', .55, .67]]);
+  } else if (scene === 'kidney') {
+    usRegion(ctx, W, H, E(.28, .35, .18, .16), .5);            // hígado
+    usRegion(ctx, W, H, E(.5, .55, .27, .20, .08), .04);       // líquido perirrenal (halo)
+    usRegion(ctx, W, H, E(.5, .55, .22, .155, .08), .62);      // corteza hiperecogénica
+    usRegion(ctx, W, H, E(.5, .55, .15, .10, .08), .28);       // médula
+    ctx.strokeStyle = 'rgba(240,240,240,.85)'; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(.5 * W, .55 * H, .135 * W, .088 * H, .08, 0, Math.PI * 2); ctx.stroke(); // banda medular
+    usRegion(ctx, W, H, E(.5, .55, .07, .045, .08), .85);      // pelvis
+    usRegion(ctx, W, H, E(.5, .55, .03, .018, .08), .02);      // pielectasia
+    ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(.5 * W, .55 * H, .22 * W, .155 * H, .08, 0, Math.PI * 2); ctx.stroke(); // cápsula
+    usText(ctx, W, H, [['Riñón izq. · 7,8 cm', .38, .90]]);
+  } else if (scene === 'spleen' || scene === 'spleen-homogeneous') {
+    usRegion(ctx, W, H, E(.5, .50, .38, .20, .12), .68);
+    if (scene === 'spleen') { const r = mulberry32(5); for (let i = 0; i < 26; i++) usRegion(ctx, W, H, E(.2 + r() * .6, .38 + r() * .26, .02 + r() * .03, .02 + r() * .035), .12); }
+    usRegion(ctx, W, H, E(.5, .80, .5, .1), .35);
+    ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(.5 * W, .50 * H, .38 * W, .20 * H, .12, 0, Math.PI * 2); ctx.stroke();
+    usText(ctx, W, H, [['Bazo', .18, .30]]);
+  } else if (scene === 'echo-hcm') {
+    usRegion(ctx, W, H, E(.42, .48, .27, .27, -.2), .6);        // miocardio VI grueso
+    usRegion(ctx, W, H, E(.40, .49, .10, .13, -.2), .05);       // luz VI pequeña
+    usRegion(ctx, W, H, E(.30, .27, .12, .07, -.3), .05);       // VD
+    usRegion(ctx, W, H, E(.64, .60, .13, .17), .06);            // AI dilatada
+    // humo
+    const r = mulberry32(21); for (let i = 0; i < 40; i++) usRegion(ctx, W, H, E(.64 + (r() - .5) * .2, .60 + (r() - .5) * .26, .02 + r() * .03, .015 + r() * .03), .35, .35);
+    usRegion(ctx, W, H, E(.70, .47, .035, .03), .9);            // trombo en orejuela
+    usRegion(ctx, W, H, E(.62, .35, .07, .05, .4), .12);        // aorta
+    ctx.strokeStyle = 'rgba(255,255,255,.7)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(.62 * W, .35 * H, .07 * W, .05 * H, .4, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(.64 * W, .60 * H, .13 * W, .17 * H, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,.85)'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(.50 * W, .50 * H); ctx.lineTo(.56 * W, .56 * H); ctx.stroke(); // mitral
+    usText(ctx, W, H, [['VI', .38, .50], ['VD', .28, .28], ['Ao', .60, .36], ['AI', .60, .62]]);
+  }
+  ctx.restore();
+  // marco y texto
+  ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.font = `${Math.round(H * .03)}px monospace`;
+  ctx.fillText(label || '', W * .02, H * .06);
+  ctx.fillText('7,5 MHz · Prof 8 cm · G 62', W * .02, H * .96);
+  for (let i = 0; i <= 8; i++) { ctx.fillRect(W * .965, H * .12 + i * H * .1, i % 2 ? 4 : 8, 2); }
+}
+function usText(ctx, W, H, items) { ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.font = `bold ${Math.round(H * .032)}px monospace`; items.forEach(([t, x, y]) => ctx.fillText(t, x * W, y * H)); }
+
+/* =====================================================================
+   FROTIS SANGUÍNEO (procedural)
+   ===================================================================== */
+function drawSmear(ctx, W, H) {
+  const r = mulberry32(42);
+  let g = ctx.createRadialGradient(W / 2, H / 2, 10, W / 2, H / 2, W * .7); g.addColorStop(0, '#f7ecee'); g.addColorStop(1, '#e6d3d8');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  const s = W / 960;
+  const rbc = (x, y, rad, col, pallor, alpha) => {
+    ctx.globalAlpha = alpha == null ? .92 : alpha;
+    const gr = ctx.createRadialGradient(x, y, rad * .2, x, y, rad); gr.addColorStop(0, pallor ? '#f0b9b9' : col); gr.addColorStop(.55, col); gr.addColorStop(1, shade(col, -25));
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x, y, rad, 0, Math.PI * 2); ctx.fill();
+    if (pallor) { ctx.fillStyle = 'rgba(250,225,225,.75)'; ctx.beginPath(); ctx.arc(x, y, rad * .42, 0, Math.PI * 2); ctx.fill(); }
+    ctx.globalAlpha = 1;
+  };
+  // eritrocitos normales y policromatófilos dispersos
+  for (let i = 0; i < 150; i++) {
+    const x = r() * W, y = r() * H; if (Math.hypot(x - .62 * W, y - .42 * H) < 120 * s && r() < .8) continue;
+    const poly = r() < .18; const rad = (poly ? 21 : 17 + r() * 2.5) * s;
+    rbc(x, y, rad, poly ? '#c39fc6' : '#e79a9c', !poly);
+  }
+  // aglutinación (grumos)
+  [[.25, .62], [.80, .30]].forEach(([cx, cy]) => { for (let i = 0; i < 12; i++) { const a = r() * Math.PI * 2, d = r() * 26 * s; rbc(cx * W + Math.cos(a) * d, cy * H + Math.sin(a) * d, 17 * s, '#dd8b8f', true); } });
+  // esferocitos: cúmulo principal + dispersos
+  for (let i = 0; i < 16; i++) { const a = r() * Math.PI * 2, d = r() * 95 * s; rbc(.62 * W + Math.cos(a) * d, .42 * H + Math.sin(a) * d, (11 + r() * 1.5) * s, '#c4474f', false, 1); }
+  for (let i = 0; i < 10; i++) rbc(r() * W, r() * H, (11 + r() * 1.5) * s, '#c4474f', false, 1);
+  // neutrófilo en banda
+  const nx = .82 * W, ny = .72 * H; ctx.fillStyle = '#e9dbe2'; ctx.beginPath(); ctx.arc(nx, ny, 30 * s, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = '#5b2d78'; ctx.lineWidth = 11 * s; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(nx - 16 * s, ny - 10 * s); ctx.quadraticCurveTo(nx + 4 * s, ny + 20 * s, nx + 18 * s, ny - 8 * s); ctx.stroke();
+  // plaquetas
+  ctx.fillStyle = '#8a5fa8'; for (let i = 0; i < 25; i++) { ctx.beginPath(); ctx.arc(r() * W, r() * H, (2.5 + r() * 2) * s, 0, Math.PI * 2); ctx.fill(); }
+  ctx.fillStyle = 'rgba(40,20,40,.75)'; ctx.font = `${Math.round(H * .03)}px monospace`; ctx.fillText('Frotis · Diff-Quik · ×100 (inmersión)', W * .02, H * .06);
+}
+function shade(hex, amt) { const n = parseInt(hex.slice(1), 16); let r = (n >> 16) + amt, g = ((n >> 8) & 255) + amt, b = (n & 255) + amt; r = clamp(r, 0, 255); g = clamp(g, 0, 255); b = clamp(b, 0, 255); return `rgb(${r},${g},${b})`; }
+/* =====================================================================
+   ESCENA 3D — Sala de medicina interna
+   ===================================================================== */
+const SCENE = { ready: false, interactables: [], anchors: {}, patient: null, doorPivot: null };
+let scene, camera, renderer, controls, clock;
+let monitorTex, negTex, keypadTex, monitorCanvas, negCanvas, keypadCanvas;
+let cabinetLight, doorLight, lampLight;
+
+function mat(color, opts) { return new THREE.MeshStandardMaterial(Object.assign({ color, roughness: .6, metalness: .1 }, opts || {})); }
+function box(w, h, d, m, x, y, z, shadow) { const me = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); me.position.set(x, y, z); if (shadow !== false) { me.castShadow = true; me.receiveShadow = true; } return me; }
+function cyl(rt, rb, h, m, x, y, z, seg) { const me = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg || 24), m); me.position.set(x, y, z); me.castShadow = true; me.receiveShadow = true; return me; }
+function tagStation(group, key) { group.traverse(o => { if (o.isMesh) { o.userData.station = key; SCENE.interactables.push(o); } }); }
+
+function makeTileTexture() {
+  const c = document.createElement('canvas'); c.width = c.height = 512; const x = c.getContext('2d');
+  x.fillStyle = '#93a3b3'; x.fillRect(0, 0, 512, 512);
+  const r = mulberry32(8);
+  for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) { const v = 150 + r() * 22; x.fillStyle = `rgb(${v - 10},${v},${v + 8})`; x.fillRect(i * 128 + 3, j * 128 + 3, 122, 122); }
+  x.strokeStyle = '#6b7a88'; x.lineWidth = 4; for (let i = 0; i <= 512; i += 128) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i, 512); x.stroke(); x.beginPath(); x.moveTo(0, i); x.lineTo(512, i); x.stroke(); }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(7, 7); t.anisotropy = 4; return t;
+}
+function makeWallTexture() {
+  const c = document.createElement('canvas'); c.width = c.height = 256; const x = c.getContext('2d');
+  x.fillStyle = '#c9d4de'; x.fillRect(0, 0, 256, 256); const r = mulberry32(2);
+  for (let i = 0; i < 3000; i++) { x.fillStyle = `rgba(0,0,0,${r() * .04})`; x.fillRect(r() * 256, r() * 256, 2, 2); }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(4, 2); return t;
+}
+function makePosterTexture(title, lines, color) {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 720; const x = c.getContext('2d');
+  x.fillStyle = '#f5f7fa'; x.fillRect(0, 0, 512, 720); x.fillStyle = color; x.fillRect(0, 0, 512, 110);
+  x.fillStyle = '#fff'; x.font = 'bold 40px sans-serif'; x.fillText(title, 28, 70);
+  x.fillStyle = '#1f2937'; x.font = '26px sans-serif'; lines.forEach((l, i) => x.fillText(l, 28, 170 + i * 46));
+  x.fillStyle = color; for (let i = 0; i < 5; i++) { x.fillRect(28, 420 + i * 50, 456, 3); }
+  return new THREE.CanvasTexture(c);
+}
+
+function buildScene() {
+  const container = $('canvas-container');
+  scene = new THREE.Scene(); scene.background = new THREE.Color(0x0a1020); scene.fog = new THREE.Fog(0x0a1020, 12, 26);
+  camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, .1, 60); camera.position.set(0, 4.2, 7.6);
+  renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+  renderer.setSize(window.innerWidth, window.innerHeight); renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = .82; renderer.outputEncoding = THREE.sRGBEncoding;
+  container.appendChild(renderer.domElement);
+  clock = new THREE.Clock();
+
+  if (THREE.OrbitControls) {
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true; controls.dampingFactor = .07; controls.maxPolarAngle = Math.PI / 2.08; controls.minDistance = 1.2; controls.maxDistance = 11; controls.target.set(0, 1.1, 0);
+    controls.enablePan = false;
+  } else { controls = { target: new THREE.Vector3(0, 1.1, 0), update() { camera.lookAt(this.target); } }; }
+
+  // ---- iluminación ----
+  scene.add(new THREE.HemisphereLight(0xcfdcf0, 0x1c2230, .32));
+  lampLight = new THREE.SpotLight(0xfff4e0, 1.35, 14, Math.PI / 4.4, .4, 1); lampLight.position.set(0, 3.9, 0); lampLight.target.position.set(0, 1, 0); lampLight.castShadow = true;
+  lampLight.shadow.mapSize.set(2048, 2048); lampLight.shadow.bias = -.0005; scene.add(lampLight); scene.add(lampLight.target);
+  [[-3, 3.95, -2.5], [3, 3.95, 1.5]].forEach(p => { const l = new THREE.PointLight(0xe8f1ff, .32, 12, 2); l.position.set(...p); scene.add(l); });
+  cabinetLight = new THREE.PointLight(0x22d3ee, 1.2, 6, 2); cabinetLight.position.set(4.0, 2.6, -4.4); scene.add(cabinetLight);
+  const negLight = new THREE.PointLight(0x7dd3fc, 1.2, 5, 2); negLight.position.set(-5.2, 2.1, 1.2); scene.add(negLight);
+  const monLight = new THREE.PointLight(0x34d399, .6, 3, 2); monLight.position.set(-2.2, 1.7, 1.1); scene.add(monLight);
+  doorLight = new THREE.PointLight(0xf87171, .8, 4, 2); doorLight.position.set(5.5, 2.6, 1.5); scene.add(doorLight);
+
+  // ---- sala ----
+  const room = new THREE.Group();
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(12, 12), new THREE.MeshStandardMaterial({ map: makeTileTexture(), roughness: .35, metalness: .05 }));
+  floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; room.add(floor);
+  const wallMat = new THREE.MeshStandardMaterial({ map: makeWallTexture(), color: 0x9fb2c4, roughness: .85 });
+  const wallLo = new THREE.MeshStandardMaterial({ color: 0x24596f, roughness: .6 });
+  const mkWall = (w, x, z, ry) => { const g = new THREE.Group(); const up = new THREE.Mesh(new THREE.PlaneGeometry(w, 2.9), wallMat); up.position.y = 2.55; const lo = new THREE.Mesh(new THREE.PlaneGeometry(w, 1.1), wallLo); lo.position.y = .55; const band = new THREE.Mesh(new THREE.PlaneGeometry(w, .06), mat(0xe2e8f0)); band.position.y = 1.12; g.add(up, lo, band); g.position.set(x, 0, z); g.rotation.y = ry; up.receiveShadow = lo.receiveShadow = true; return g; };
+  room.add(mkWall(12, 0, -6, 0), mkWall(12, -6, 0, Math.PI / 2), mkWall(12, 6, 0, -Math.PI / 2), mkWall(12, 0, 6, Math.PI));
+  const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(12, 12), mat(0xb9c3cf, { roughness: .9 })); ceiling.rotation.x = Math.PI / 2; ceiling.position.y = 4; room.add(ceiling);
+  [[-3, -2.5], [3, 1.5], [-3, 2.5], [3, -2.5]].forEach(([x, z]) => { const p = new THREE.Mesh(new THREE.PlaneGeometry(1.4, .7), new THREE.MeshBasicMaterial({ color: 0xf1f6ff })); p.rotation.x = Math.PI / 2; p.position.set(x, 3.98, z); room.add(p); });
+  // lámpara quirúrgica
+  const lampArm = cyl(.03, .03, .6, mat(0xd1d5db, { metalness: .8, roughness: .3 }), 0, 3.7, 0); room.add(lampArm);
+  const lampHead = cyl(.42, .5, .14, mat(0xe5e7eb, { metalness: .7, roughness: .25 }), 0, 3.38, 0, 40); room.add(lampHead);
+  const lampGlass = new THREE.Mesh(new THREE.CircleGeometry(.4, 40), new THREE.MeshBasicMaterial({ color: 0xfff7e0 })); lampGlass.rotation.x = Math.PI / 2; lampGlass.position.y = 3.3; room.add(lampGlass);
+  // jaulas de hospitalización (pared del fondo)
+  const cages = new THREE.Group(); const cageMat = mat(0xcbd5e1, { metalness: .7, roughness: .35 });
+  for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) {
+    const cx = -0.5 + i * 1.1, cy = .45 + j * .9; cages.add(box(1.05, .85, .9, cageMat, cx, cy, -5.5));
+    const inner = box(.98, .78, .82, mat(0x1e293b), cx, cy, -5.46, false); cages.add(inner);
+    for (let b = -.42; b <= .42; b += .12) cages.add(cyl(.008, .008, .78, mat(0xe2e8f0, { metalness: .9 }), cx + b, cy, -5.05, 8));
+  }
+  room.add(cages);
+  // póster y reloj
+  const poster = new THREE.Mesh(new THREE.PlaneGeometry(.7, 1), new THREE.MeshBasicMaterial({ map: makePosterTexture('IRIS · LRA', ['Grado I  < 1,6 mg/dL', 'Grado II 1,7 – 2,5', 'Grado III 2,6 – 5,0', 'Grado IV 5,1 – 10', 'Grado V > 10'], '#0e7490') })); poster.position.set(-1.5, 2.4, -5.97); room.add(poster);
+  const poster2 = new THREE.Mesh(new THREE.PlaneGeometry(.7, 1), new THREE.MeshBasicMaterial({ map: makePosterTexture('Shock', ['Índice FC/PAS > 1', 'Lactato > 2,5', 'TRC > 2 s', 'PAM < 65', 'Reevaluar cada 15 min'], '#b91c1c') })); poster2.position.set(3.2, 2.4, -5.97); room.add(poster2);
+  const clockFace = new THREE.Mesh(new THREE.CircleGeometry(.25, 32), new THREE.MeshBasicMaterial({ color: 0xf8fafc })); clockFace.position.set(0, 3.3, -5.97); room.add(clockFace);
+  const hand = box(.02, .18, .01, mat(0x111827), 0, 3.38, -5.96, false); room.add(hand); const hand2 = box(.02, .12, .01, mat(0x111827), .05, 3.28, -5.96, false); hand2.rotation.z = -1.2; room.add(hand2);
+  // lavabo (pared derecha)
+  const sink = box(1.0, .9, .6, mat(0xf1f5f9, { roughness: .4 }), 5.65, .45, -1.6); room.add(sink); const basin = box(.7, .08, .45, mat(0xcbd5e1, { metalness: .8, roughness: .2 }), 5.65, .92, -1.6); room.add(basin);
+  const tap = cyl(.02, .02, .3, mat(0xd1d5db, { metalness: .9, roughness: .2 }), 5.9, 1.05, -1.6); room.add(tap);
+  scene.add(room);
+
+  // ---- ESTACIÓN: mesa de exploración + paciente ----
+  const table = new THREE.Group();
+  table.add(cyl(.32, .42, .85, mat(0x94a3b8, { metalness: .85, roughness: .25 }), 0, .43, 0));
+  table.add(box(2.3, .07, 1.15, mat(0xf1f5f9, { metalness: .8, roughness: .2 }), 0, .9, 0));
+  table.add(box(2.15, .05, 1.0, mat(0x1d4ed8, { roughness: .8 }), 0, .96, 0));
+  const tray = box(.5, .02, .3, mat(0xcbd5e1, { metalness: .9, roughness: .2 }), -.85, 1.0, .35); table.add(tray);
+  [[-.95, .3, 0xef4444], [-.85, .3, 0x2563eb], [-.75, .3, 0x10b981]].forEach(([x, z, c]) => table.add(cyl(.012, .012, .1, mat(c), x, 1.06, z, 10)));
+  // manta térmica y bomba de infusión
+  scene.add(table); tagStation(table, 'patient');
+  SCENE.anchors.patient = new THREE.Vector3(0, 1.75, 0);
+  // palo de suero
+  const iv = new THREE.Group(); iv.add(cyl(.22, .22, .03, mat(0x64748b, { metalness: .8 }), 0, .015, 0)); iv.add(cyl(.018, .018, 2.1, mat(0xd1d5db, { metalness: .9, roughness: .2 }), 0, 1.05, 0));
+  iv.add(box(.4, .02, .02, mat(0xd1d5db, { metalness: .9 }), 0, 2.1, 0)); const bag = box(.16, .3, .06, new THREE.MeshPhysicalMaterial({ color: 0xbae6fd, transparent: true, opacity: .75, roughness: .2, transmission: .4 }), .18, 1.9, 0); iv.add(bag);
+  iv.add(box(.12, .07, .05, mat(0xfef3c7), .18, 1.95, .04, false)); const pump = box(.28, .22, .2, mat(0xf8fafc, { roughness: .5 }), 0, 1.45, 0); iv.add(pump); const pumpScreen = box(.2, .09, .01, new THREE.MeshBasicMaterial({ color: 0x4ade80 }), 0, 1.48, .105, false); iv.add(pumpScreen);
+  iv.position.set(1.15, 0, -.85); scene.add(iv); tagStation(iv, 'patient');
+
+  // ---- ESTACIÓN: monitor ----
+  const cart = new THREE.Group();
+  cart.add(box(.55, .05, .5, mat(0x475569, { metalness: .7 }), 0, .03, 0)); cart.add(cyl(.035, .035, 1.35, mat(0xd1d5db, { metalness: .9, roughness: .2 }), 0, .7, 0));
+  cart.add(box(.78, .55, .16, mat(0x0f172a, { roughness: .4 }), 0, 1.55, 0));
+  monitorCanvas = document.createElement('canvas'); monitorCanvas.width = 512; monitorCanvas.height = 320;
+  monitorTex = new THREE.CanvasTexture(monitorCanvas); monitorTex.encoding = THREE.sRGBEncoding;
+  const monScreen = new THREE.Mesh(new THREE.PlaneGeometry(.7, .47), new THREE.MeshBasicMaterial({ map: monitorTex })); monScreen.position.set(0, 1.55, .085); cart.add(monScreen);
+  [[-.3, 1.24, 0xef4444], [-.2, 1.24, 0xfbbf24], [-.1, 1.24, 0x22c55e]].forEach(([x, y, c]) => cart.add(cyl(.012, .012, .02, new THREE.MeshBasicMaterial({ color: c }), x, y, .09, 8)));
+  cart.position.set(-2.25, 0, .7); cart.rotation.y = .55; scene.add(cart); tagStation(cart, 'monitor');
+  SCENE.anchors.monitor = new THREE.Vector3(-2.25, 2.0, .7);
+
+  // ---- ESTACIÓN: negatoscopio ----
+  const neg = new THREE.Group();
+  neg.add(box(1.9, 1.15, .07, mat(0x111827, { metalness: .6, roughness: .3 }), 0, 0, 0));
+  negCanvas = document.createElement('canvas'); negCanvas.width = 640; negCanvas.height = 360; negTex = new THREE.CanvasTexture(negCanvas); negTex.encoding = THREE.sRGBEncoding;
+  const negScreen = new THREE.Mesh(new THREE.PlaneGeometry(1.76, 1.0), new THREE.MeshBasicMaterial({ map: negTex })); negScreen.position.z = .04; neg.add(negScreen);
+  const negBtn = cyl(.02, .02, .02, new THREE.MeshBasicMaterial({ color: 0x38bdf8 }), .85, -.5, .045, 10); negBtn.rotation.x = Math.PI / 2; neg.add(negBtn);
+  neg.position.set(-5.95, 2.05, 1.2); neg.rotation.y = Math.PI / 2; scene.add(neg); tagStation(neg, 'imaging');
+  // ecógrafo portátil bajo el negatoscopio
+  const eco = new THREE.Group(); eco.add(box(.6, .05, .5, mat(0x475569, { metalness: .7 }), 0, .03, 0)); eco.add(cyl(.03, .03, .9, mat(0xd1d5db, { metalness: .9, roughness: .2 }), 0, .48, 0)); eco.add(box(.62, .42, .08, mat(0xf8fafc, { roughness: .4 }), 0, 1.05, 0));
+  const ecoScr = new THREE.Mesh(new THREE.PlaneGeometry(.5, .32), new THREE.MeshBasicMaterial({ color: 0x1f2937 })); ecoScr.position.set(0, 1.06, .045); eco.add(ecoScr);
+  const probe = cyl(.03, .04, .18, mat(0x94a3b8), .38, .9, .1, 12); probe.rotation.z = .5; eco.add(probe);
+  eco.position.set(-5.45, 0, 2.3); eco.rotation.y = Math.PI / 2; scene.add(eco); tagStation(eco, 'imaging');
+  SCENE.anchors.imaging = new THREE.Vector3(-5.8, 2.85, 1.2);
+
+  // ---- ESTACIÓN: laboratorio ----
+  const lab = new THREE.Group();
+  lab.add(box(2.6, .9, .85, mat(0x334155, { roughness: .35 }), 0, .45, 0)); lab.add(box(2.7, .05, .95, mat(0xe2e8f0, { roughness: .3 }), 0, .925, 0));
+  for (let i = -1; i <= 1; i++) lab.add(box(.02, .5, .8, mat(0x1e293b), i * .85, .4, 0, false));
+  const analyzer = box(.55, .42, .45, mat(0xf1f5f9, { roughness: .4 }), -.75, 1.16, 0); lab.add(analyzer);
+  const anC = document.createElement('canvas'); anC.width = 256; anC.height = 144; const ax = anC.getContext('2d'); ax.fillStyle = '#062a3a'; ax.fillRect(0, 0, 256, 144); ax.fillStyle = '#22d3ee'; ax.font = 'bold 18px monospace'; ax.fillText('ANALIZADOR · LISTO', 12, 28); ax.font = '16px monospace'; ax.fillStyle = '#a5f3fc'; ['Gases · Iones · Bioq', 'Muestra: heparina Li', 'Resultado en pantalla', '► Ver analítica'].forEach((l, i) => ax.fillText(l, 12, 56 + i * 22));
+  const anScreen = new THREE.Mesh(new THREE.PlaneGeometry(.36, .2), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(anC) })); anScreen.position.set(-.75, 1.22, .228); lab.add(anScreen);
+  // microscopio
+  const mic = new THREE.Group(); mic.add(box(.22, .04, .3, mat(0x111827), 0, .02, 0)); mic.add(cyl(.03, .03, .35, mat(0x111827), -.06, .2, -.08)); mic.add(box(.16, .02, .16, mat(0x1f2937), .02, .2, .02)); const tube = cyl(.03, .035, .28, mat(0x111827), .04, .42, .05); tube.rotation.x = .5; mic.add(tube); mic.add(cyl(.028, .028, .05, mat(0x1f2937), .01, .3, .03, 12));
+  mic.position.set(.2, .95, 0); lab.add(mic);
+  // gradilla y tubos, centrífuga
+  lab.add(box(.32, .06, .12, mat(0xf8fafc), .85, .98, .15));
+  [0xa855f7, 0x22c55e, 0xef4444, 0x3b82f6, 0xf59e0b].forEach((c, i) => { const t = cyl(.014, .014, .1, new THREE.MeshPhysicalMaterial({ color: c, transparent: true, opacity: .85, roughness: .1 }), .73 + i * .06, 1.06, .15, 10); lab.add(t); });
+  lab.add(cyl(.16, .17, .16, mat(0xcbd5e1, { metalness: .5, roughness: .35 }), .9, 1.03, -.22, 24));
+  lab.position.set(-3.4, 0, -5.5); scene.add(lab); tagStation(lab, 'lab');
+  SCENE.anchors.lab = new THREE.Vector3(-3.4, 1.75, -5.4);
+  // frigorífico de muestras
+  const fridge = box(.8, 1.8, .7, mat(0xf8fafc, { roughness: .35, metalness: .3 }), -5.5, .9, -5.4); scene.add(fridge); scene.add(box(.02, 1.0, .03, mat(0x94a3b8, { metalness: .9 }), -5.08, 1.0, -5.05, false));
+
+  // ---- ESTACIÓN: farmacia ----
+  const cab = new THREE.Group();
+  const cabMat = mat(0x0f172a, { metalness: .8, roughness: .25 });
+  cab.add(box(1.8, 2.6, .06, cabMat, 0, 1.3, -.28)); cab.add(box(.09, 2.6, .62, cabMat, -.855, 1.3, 0)); cab.add(box(.09, 2.6, .62, cabMat, .855, 1.3, 0)); cab.add(box(1.8, .09, .62, cabMat, 0, 2.555, 0)); cab.add(box(1.8, .09, .62, cabMat, 0, .045, 0));
+  cab.add(box(1.62, 2.42, .5, new THREE.MeshStandardMaterial({ color: 0x0b3a4a, emissive: 0x0e7490, emissiveIntensity: .45, roughness: .4, side: THREE.BackSide }), 0, 1.3, .05, false));
+  for (let y = .5; y <= 2.2; y += .5) cab.add(box(1.6, .025, .44, new THREE.MeshPhysicalMaterial({ color: 0x7dd3fc, transparent: true, opacity: .55, roughness: .05 }), 0, y, .06, false));
+  const cols = [0xef4444, 0x10b981, 0x38bdf8, 0xf59e0b, 0xa855f7, 0xf8fafc];
+  const rb = mulberry32(17);
+  for (let i = 0; i < 30; i++) { const row = Math.floor(i / 6), hgt = .1 + rb() * .1; const b = cyl(.035, .035, hgt, new THREE.MeshPhysicalMaterial({ color: cols[i % 6], roughness: .1, transparent: true, opacity: .9 }), -.62 + (i % 6) * .25, .5 + row * .5 + hgt / 2 + .013, -.08 + rb() * .22, 12); cab.add(b); cab.add(cyl(.02, .02, .03, mat(0xe5e7eb, { metalness: .8 }), b.position.x, b.position.y + hgt / 2 + .015, b.position.z, 10)); }
+  // cajones inferiores
+  cab.add(box(1.6, .35, .05, mat(0x1e293b), 0, .22, .3)); cab.add(box(.3, .03, .02, mat(0xcbd5e1, { metalness: .9 }), 0, .22, .33, false));
+  // puertas de cristal
+  const glass = new THREE.Mesh(new THREE.PlaneGeometry(1.62, 2.42), new THREE.MeshPhysicalMaterial({ color: 0xbae6fd, transparent: true, opacity: .16, roughness: .3, metalness: .05 })); glass.position.set(0, 1.3, .315); cab.add(glass);
+  cab.add(box(.012, 2.42, .01, mat(0xcbd5e1, { metalness: .9 }), 0, 1.3, .32, false));
+  // teclado
+  cab.add(box(.34, .5, .05, mat(0x1e293b, { metalness: .6, roughness: .4 }), 0, 1.35, .34));
+  keypadCanvas = document.createElement('canvas'); keypadCanvas.width = 256; keypadCanvas.height = 96; keypadTex = new THREE.CanvasTexture(keypadCanvas);
+  const kp = new THREE.Mesh(new THREE.PlaneGeometry(.28, .105), new THREE.MeshBasicMaterial({ map: keypadTex })); kp.position.set(0, 1.5, .366); cab.add(kp);
+  for (let i = 0; i < 12; i++) cab.add(box(.07, .05, .012, new THREE.MeshStandardMaterial({ color: 0x334155, emissive: 0x22d3ee, emissiveIntensity: .15 }), -.09 + (i % 3) * .09, 1.38 - Math.floor(i / 3) * .07, .368, false));
+  cab.add(box(1.7, .04, .04, new THREE.MeshBasicMaterial({ color: 0x22d3ee }), 0, 2.58, .3, false));
+  cab.position.set(4.0, 0, -5.65); scene.add(cab); tagStation(cab, 'cabinet');
+  SCENE.anchors.cabinet = new THREE.Vector3(4.0, 2.95, -5.4);
+
+  // ---- puerta de salida ----
+  const doorFrame = new THREE.Group(); doorFrame.add(box(.12, 2.3, 1.3, mat(0x94a3b8, { metalness: .5 }), 0, 1.15, 0, false));
+  SCENE.doorPivot = new THREE.Group(); SCENE.doorPivot.position.set(0, 0, -.58);
+  const door = box(.08, 2.2, 1.16, mat(0xe2e8f0, { roughness: .5 }), 0, 1.1, .58); SCENE.doorPivot.add(door);
+  const win = new THREE.Mesh(new THREE.PlaneGeometry(.35, .5), new THREE.MeshPhysicalMaterial({ color: 0x93c5fd, transparent: true, opacity: .5 })); win.rotation.y = -Math.PI / 2; win.position.set(-.045, 1.6, .58); SCENE.doorPivot.add(win);
+  SCENE.doorPivot.add(cyl(.02, .02, .18, mat(0xd1d5db, { metalness: .9 }), -.08, 1.05, .95, 12));
+  doorFrame.add(SCENE.doorPivot);
+  const exitSign = new THREE.Mesh(new THREE.PlaneGeometry(.5, .18), new THREE.MeshBasicMaterial({ color: 0x22c55e })); exitSign.rotation.y = -Math.PI / 2; exitSign.position.set(-.1, 2.5, 0); doorFrame.add(exitSign);
+  const exitTxtC = document.createElement('canvas'); exitTxtC.width = 256; exitTxtC.height = 92; const ex = exitTxtC.getContext('2d'); ex.fillStyle = '#14532d'; ex.fillRect(0, 0, 256, 92); ex.fillStyle = '#bbf7d0'; ex.font = 'bold 54px sans-serif'; ex.fillText('SALIDA', 22, 66);
+  exitSign.material = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(exitTxtC) });
+  doorFrame.position.set(5.96, 0, 1.5); scene.add(doorFrame);
+
+  // tirar cables del monitor al paciente (decorativo)
+  const wire = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(-1.95, 1.3, .55), new THREE.Vector3(-1.2, .8, .3), new THREE.Vector3(-.4, 1.0, .1)]), 20, .008, 6), mat(0x22c55e)); scene.add(wire);
+  const ivLine = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3([new THREE.Vector3(1.33, 1.75, -.85), new THREE.Vector3(1.0, 1.35, -.6), new THREE.Vector3(.3, 1.12, -.2)]), 20, .006, 6), mat(0xe0f2fe, { transparent: true, opacity: .8 })); scene.add(ivLine);
+
+  SCENE.ready = true;
+}
+
+/* ---- paciente (perro / gato) ---- */
+function capsule(r, len, m) {
+  const g = new THREE.Group();
+  const c = new THREE.Mesh(new THREE.CylinderGeometry(r, r, len, 18, 1, true), m); c.castShadow = true; g.add(c);
+  [1, -1].forEach(k => { const s = new THREE.Mesh(new THREE.SphereGeometry(r, 18, 12), m); s.position.y = k * len / 2; s.castShadow = true; g.add(s); });
+  return g;
+}
+function buildPatient(species, coat) {
+  if (SCENE.patient) { scene.remove(SCENE.patient); SCENE.interactables = SCENE.interactables.filter(o => !o.userData.isPatient); }
+  const g = new THREE.Group(); const cat = species === 'cat'; const s = cat ? .62 : 1;
+  const furMat = mat(coat.body, { roughness: .9 }); const darkMat = mat(coat.dark, { roughness: .9 });
+  // tronco: perfil revolucionado (grupa → tórax → cuello)
+  const prof = [[-.62, 0], [-.6, .12], [-.5, .17], [-.35, .19], [-.15, .2], [.05, .22], [.25, .24], [.4, .22], [.5, .17], [.56, .12], [.58, 0]].map(([x, r]) => new THREE.Vector2(r * s, x * s));
+  const torso = new THREE.Mesh(new THREE.LatheGeometry(prof, 28), furMat); torso.rotation.z = -Math.PI / 2; torso.castShadow = true; torso.receiveShadow = true; g.add(torso);
+  const chest = new THREE.Mesh(new THREE.SphereGeometry(.2 * s, 18, 14), furMat); chest.position.set(.22 * s, -.03 * s, .06 * s); chest.scale.set(1.1, .9, 1.1); chest.castShadow = true; g.add(chest);
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(.12 * s, .17 * s, .25 * s, 14), furMat); neck.rotation.z = -Math.PI / 2 + .15; neck.position.set(.56 * s, .02 * s, 0); g.add(neck);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(.15 * s, 18, 14), furMat); head.position.set(.7 * s, .04 * s, .02 * s); head.scale.set(cat ? 1 : 1.2, .95, .95); head.castShadow = true; g.add(head);
+  const snout = new THREE.Mesh(new THREE.BoxGeometry((cat ? .08 : .2) * s, (cat ? .07 : .1) * s, (cat ? .09 : .12) * s), cat ? furMat : darkMat); snout.position.set((cat ? .8 : .88) * s, (cat ? 0 : -.01) * s, .02 * s); g.add(snout);
+  const nose = new THREE.Mesh(new THREE.SphereGeometry(.025 * s, 10, 8), mat(0x111827)); nose.position.set((cat ? .85 : .99) * s, .02 * s, .02 * s); g.add(nose);
+  const eye = new THREE.Mesh(new THREE.SphereGeometry(.022 * s, 10, 8), mat(0x0f172a)); eye.position.set(.77 * s, .1 * s, .12 * s); g.add(eye);
+  if (cat) { [1, -1].forEach(k => { const ear = new THREE.Mesh(new THREE.ConeGeometry(.05 * s, .12 * s, 4), furMat); ear.position.set(.66 * s, .18 * s, k * .08 * s); ear.rotation.z = -.3; g.add(ear); }); }
+  else { [1, -1].forEach(k => { const ear = new THREE.Mesh(new THREE.SphereGeometry(.09 * s, 12, 8), darkMat); ear.scale.set(.7, .3, 1.3); ear.position.set(.62 * s, .12 * s, k * .13 * s); ear.rotation.x = k * .5; g.add(ear); }); }
+  // patas (decúbito lateral: patas hacia el observador)
+  [[.34, 0, .02], [.2, 0, .1], [-.32, 0, .02], [-.46, 0, .1]].forEach(([x, y, z], i) => {
+    const yy = (i % 2 === 0) ? -.06 : -.15; // patas superiores ligeramente elevadas, inferiores apoyadas
+    const thigh = new THREE.Mesh(new THREE.SphereGeometry(.13 * s, 14, 10), furMat); thigh.position.set(x * s, (yy + .02) * s, (.12 + z) * s); thigh.scale.set(1, .7, 1.3); thigh.castShadow = true; g.add(thigh);
+    const leg = capsule(.06 * s, .32 * s, furMat); leg.rotation.x = Math.PI / 2; leg.position.set(x * s, yy * s, (.36 + z) * s); g.add(leg);
+    const paw = new THREE.Mesh(new THREE.SphereGeometry(.065 * s, 12, 8), darkMat); paw.position.set(x * s, yy * s, (.56 + z) * s); paw.scale.set(1, .7, 1.3); g.add(paw); });
+  const tail = new THREE.Mesh(new THREE.CylinderGeometry(.02 * s, .04 * s, (cat ? .5 : .4) * s, 10), furMat); tail.rotation.z = Math.PI / 2 + .3; tail.rotation.y = .5; tail.position.set(-.62 * s, -.02, .15 * s); g.add(tail);
+  // manta y electrodos
+  const blanket = new THREE.Mesh(new THREE.CylinderGeometry(.27 * s, .25 * s, .55 * s, 24, 1, true, Math.PI * .15, Math.PI * .85), new THREE.MeshStandardMaterial({ color: 0x0ea5e9, roughness: .85, side: THREE.DoubleSide })); blanket.rotation.z = Math.PI / 2; blanket.rotation.y = 0; blanket.position.set(-.28 * s, .01, 0); blanket.castShadow = true; g.add(blanket);
+  [[.1, .16, .17], [.0, .12, .2]].forEach(([x, y, z]) => { const e = new THREE.Mesh(new THREE.CylinderGeometry(.02, .02, .01, 10), mat(0xf8fafc)); e.rotation.x = Math.PI / 2; e.position.set(x * s, y * s, z * s); g.add(e); });
+  g.position.set(0, 1.0 + .22 * s, 0); g.userData.torso = torso; g.userData.chest = chest;
+  g.traverse(o => { if (o.isMesh) { o.userData.station = 'patient'; o.userData.isPatient = true; SCENE.interactables.push(o); } });
+  scene.add(g); SCENE.patient = g;
+}
+
+/* ---- texturas dinámicas ---- */
+function drawMonitorTexture(c) {
+  const x = monitorCanvas.getContext('2d'), W = monitorCanvas.width, H = monitorCanvas.height;
+  x.fillStyle = '#03110b'; x.fillRect(0, 0, W, H);
+  x.drawImage(ECG.trace, 0, 22, W, 110);
+  x.font = 'bold 13px monospace'; x.fillStyle = '#34d399'; x.fillText('DII  25 mm/s  1 mV', 8, 16); x.fillStyle = '#94a3b8'; x.fillText(c ? c.patient.toUpperCase() : '', W - 90, 16);
+  const cells = c ? [['FC', c.monitor.hr, '#34d399'], ['SpO₂', c.monitor.spo2 + '%', '#60a5fa'], ['PANI', c.monitor.bp, '#f87171'], ['PAM', c.monitor.map, '#f87171'], ['FR', c.monitor.rr, '#fbbf24'], ['Tª', c.monitor.temp.toFixed(1), '#c4b5fd']] : [];
+  cells.forEach(([k, v, col], i) => { const cx = 8 + (i % 3) * 168, cy = 150 + Math.floor(i / 3) * 84; x.fillStyle = 'rgba(255,255,255,.05)'; x.fillRect(cx, cy, 160, 76); x.fillStyle = col; x.font = 'bold 12px monospace'; x.fillText(k, cx + 8, cy + 18); x.font = 'bold 34px monospace'; x.fillText(String(v), cx + 8, cy + 60); });
+  monitorTex.needsUpdate = true;
+}
+function drawNegTexture(c) {
+  const x = negCanvas.getContext('2d', { willReadFrequently: true }); drawRX(x, negCanvas.width, negCanvas.height, c.imaging.rx); negTex.needsUpdate = true;
+}
+function drawKeypadTexture(text, color) {
+  const x = keypadCanvas.getContext('2d'); x.fillStyle = '#020617'; x.fillRect(0, 0, 256, 96);
+  x.fillStyle = color || '#22d3ee'; x.font = 'bold 62px monospace'; x.textAlign = 'center'; x.fillText(text, 128, 70); x.textAlign = 'left'; keypadTex.needsUpdate = true;
+}
+
+/* ---- cámara ---- */
+const VIEWS = {
+  overview: { pos: [0, 4.2, 7.6], tgt: [0, 1.1, 0] },
+  patient: { pos: [.55, 2.35, 2.45], tgt: [0, 1.05, 0] },
+  monitor: { pos: [-1.1, 1.9, 2.4], tgt: [-2.25, 1.5, .7] },
+  lab: { pos: [-2.7, 2.0, -3.1], tgt: [-3.4, 1.05, -5.4] },
+  imaging: { pos: [-3.7, 2.0, 1.3], tgt: [-5.95, 2.0, 1.2] },
+  cabinet: { pos: [3.1, 2.0, -3.0], tgt: [4.0, 1.5, -5.5] }
+};
+let camAnim = null;
+function focusCamera(key, dur) {
+  const v = VIEWS[key]; if (!v) return;
+  const tgt = new THREE.Vector3(...v.tgt), pos = new THREE.Vector3(...v.pos);
+  if (camera.aspect < .9 && key !== 'overview') pos.sub(tgt).multiplyScalar(1.55).add(tgt); // en pantallas verticales, alejar un poco
+  camAnim = { t: 0, start: performance.now(), dur: dur || .9, p0: camera.position.clone(), p1: pos, t0: controls.target.clone(), t1: tgt };
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.view === key));
+}
+function updateCamera(dt) {
+  if (!camAnim) return;
+  camAnim.t = (performance.now() - camAnim.start) / 1000 / camAnim.dur; const k = camAnim.t >= 1 ? 1 : (1 - Math.cos(Math.min(1, camAnim.t) * Math.PI)) / 2;
+  camera.position.lerpVectors(camAnim.p0, camAnim.p1, k); controls.target.lerpVectors(camAnim.t0, camAnim.t1, k);
+  if (camAnim.t >= 1) camAnim = null;
+}
+/* =====================================================================
+   LÓGICA DEL ESCAPE ROOM
+   ===================================================================== */
+const CASE_TIME = 20 * 60, ERR_PENALTY = 45, HINT_PENALTY = 60;
+const STATIONS = ['patient', 'monitor', 'lab', 'imaging'];
+const STATION_NAMES = { patient: 'Paciente', monitor: 'Monitor', lab: 'Laboratorio', imaging: 'Imagen', cabinet: 'Farmacia' };
+const COATS = { taponamiento: { body: 0xc9953a, dark: 0x7c4a12 }, leptospirosis: { body: 0xe7e2d6, dark: 0x6b3f1d }, hipercalcemia: { body: 0xb5713b, dark: 0x3f2a1a }, ahim: { body: 0xb3622b, dark: 0x5b3113 }, hipertiroidismo: { body: 0x8b857c, dark: 0x3f3a35 } };
+
+const G = { c: null, idx: 0, mode: 'single', time: CASE_TIME, errors: 0, hints: 0, solved: {}, hintUsed: {}, cabStep: 1, code: '', running: false, timerId: null, scores: [], imgMode: 'rx', labTab: 0, finished: false };
+let progress = { best: {}, done: {} };
+try { const p = JSON.parse(localStorage.getItem('vetescape-v1') || 'null'); if (p && p.best) progress = p; } catch (e) { }
+function saveProgress() { try { localStorage.setItem('vetescape-v1', JSON.stringify(progress)); } catch (e) { } }
+
+/* ---------- UI helpers ---------- */
+let toastId = null;
+function toast(msg, kind) { const t = $('toast'); t.textContent = msg; t.className = 'show ' + (kind || ''); clearTimeout(toastId); toastId = setTimeout(() => t.className = '', 2600); }
+function openModal(id) { document.querySelectorAll('.modal-bg').forEach(m => m.classList.remove('open')); $(id).classList.add('open'); $('cue').style.display = 'none'; }
+function closeModal(id) { $(id).classList.remove('open'); playSound('beep'); }
+function closeAllModals() { document.querySelectorAll('.modal-bg').forEach(m => m.classList.remove('open')); }
+function shakeModal(id) { const m = $(id).querySelector('.modal'); m.classList.remove('shake'); void m.offsetWidth; m.classList.add('shake'); }
+function penalty(secs, msg) { G.time = Math.max(0, G.time - secs); updateHUD(); if (msg) toast(msg, 'bad'); playSound('err'); }
+function scoreNow() { return Math.max(100, Math.round(500 + G.time * .5 - G.errors * 40 - G.hints * 60)); }
+function updateHUD() {
+  const t = $('timer'); t.textContent = fmtTime(G.time); t.classList.toggle('low', G.time <= 120);
+  $('score-line').textContent = `Errores ${G.errors} · Pistas ${G.hints}`; $('score-val').textContent = scoreNow() + ' pts';
+  STATIONS.forEach(k => { const f = $('frag-' + k); const on = !!G.solved[k]; f.classList.toggle('got', on); f.querySelector('span').textContent = on ? G.c.puzzles[k].digit : '?'; });
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('done', !!G.solved[b.dataset.view] || (b.dataset.view === 'cabinet' && G.finished)));
+  updateLabels();
+}
+
+/* ---------- etiquetas 3D ---------- */
+const labelEls = {};
+function buildLabels() {
+  const wrap = $('labels'); wrap.innerHTML = '';
+  ['patient', 'monitor', 'lab', 'imaging', 'cabinet'].forEach(k => { const el = document.createElement('div'); el.className = 'st-label'; el.innerHTML = `<span class="dot"></span>${STATION_NAMES[k]}`; el.onclick = () => { playSound('beep'); openStation(k); }; wrap.appendChild(el); labelEls[k] = el; });
+}
+function updateLabels() {
+  Object.keys(labelEls).forEach(k => { const el = labelEls[k]; el.classList.toggle('done', k === 'cabinet' ? G.finished : !!G.solved[k]); el.classList.toggle('locked', k === 'cabinet' && !G.finished && !STATIONS.every(s => G.solved[s])); });
+}
+let _v = null;
+function projectLabels() {
+  if (!_v) _v = new THREE.Vector3();
+  const W = window.innerWidth, H = window.innerHeight;
+  Object.keys(labelEls).forEach(k => {
+    const el = labelEls[k]; _v.copy(SCENE.anchors[k]).project(camera);
+    const behind = _v.z > 1; const x = (_v.x + 1) / 2 * W, y = (1 - _v.y) / 2 * H;
+    const dist = camera.position.distanceTo(SCENE.anchors[k]);
+    el.classList.toggle('hidden', behind || x < 0 || x > W || y < 0 || y > H || dist < 2.2);
+    el.style.left = x + 'px'; el.style.top = y + 'px';
+  });
+}
+
+/* ---------- arranque de caso ---------- */
+function startCase(idx, mode) {
+  G.idx = idx; G.c = CASES[idx]; G.mode = mode || G.mode; G.time = CASE_TIME; G.errors = 0; G.hints = 0; G.solved = {}; G.hintUsed = {}; G.cabStep = 1; G.code = ''; G.finished = false; G.imgMode = 'rx'; G.labTab = 0;
+  closeAllModals(); $('intro').style.display = 'none'; $('hud').classList.add('on'); $('hint-msg').style.display = 'none';
+  const c = G.c;
+  $('hud-sys').textContent = `Caso ${c.n} · ${c.system}`; $('hud-title').textContent = c.title; $('hud-patient').textContent = `${c.patient} · ${c.signalment}`;
+  buildPatient(c.species, COATS[c.id]);
+  ECG.set(c.ecg); drawNegTexture(c); drawKeypadTexture('_ _ _ _');
+  if (SCENE.doorPivot) SCENE.doorPivot.rotation.y = 0; doorLight.color.setHex(0xf87171);
+  updateHUD();
+  camera.position.set(0, 4.2, 7.6); controls.target.set(0, 1.1, 0);
+  setTimeout(() => focusCamera('patient', 1.6), 300);
+  G.running = true; clearInterval(G.timerId);
+  G.timerId = setInterval(tick, 1000);
+  toast(`Caso ${c.n}: ${c.patient} acaba de entrar en la sala. Explora las estaciones.`);
+}
+function tick() {
+  if (!G.running) return;
+  G.time--; if (G.time <= 10 && G.time > 0) playSound('tick');
+  if (G.time <= 0) { G.time = 0; failCase(); }
+  updateHUD();
+}
+function failCase() {
+  G.running = false; clearInterval(G.timerId); playSound('fail'); closeAllModals();
+  $('fail-body').innerHTML = `<p><strong>${G.c.patient}</strong> no ha recibido el tratamiento a tiempo y ha entrado en parada cardiorrespiratoria.</p><p>Has reunido <b>${STATIONS.filter(s => G.solved[s]).length}/4</b> dígitos del código con ${G.errors} errores. Repasa las estaciones que no resolviste: cada enigma apunta a un hallazgo clave del caso.</p>`;
+  openModal('mb-fail');
+}
+function goMenu() {
+  G.running = false; clearInterval(G.timerId); closeAllModals(); $('hud').classList.remove('on'); $('intro').style.display = 'block'; renderCards();
+}
+function renderCards() {
+  const wrap = $('case-cards'); wrap.innerHTML = '';
+  CASES.forEach((c, i) => {
+    const el = document.createElement('div'); el.className = 'case-card' + (progress.done[c.id] ? ' done' : '');
+    el.innerHTML = `<span class="num">0${c.n}</span><div class="sys">${c.system}</div><div class="t">${c.title}</div><div class="s">${c.patient} · ${c.signalment}</div><div class="meta"><span class="stars">${'★'.repeat(c.difficulty)}${'☆'.repeat(3 - c.difficulty)}</span><span class="best">${progress.best[c.id] ? progress.best[c.id] + ' pts' : ''}</span></div>`;
+    el.onclick = () => { playSound('beep'); startCase(i, 'single'); };
+    wrap.appendChild(el);
+  });
+}
+
+/* ---------- estaciones ---------- */
+function openStation(k) {
+  if (!G.running && !G.finished) return;
+  focusCamera(k);
+  if (k === 'patient') renderPatient();
+  else if (k === 'monitor') renderMonitor();
+  else if (k === 'lab') renderLab();
+  else if (k === 'imaging') renderImaging();
+  else if (k === 'cabinet') renderCabinet();
+}
+function puzzleBox(key) {
+  const p = G.c.puzzles[key]; const solved = !!G.solved[key];
+  let inner = '';
+  if (p.type === 'mc') inner = `<div class="opts">${p.opts.map((o, i) => `<div class="opt" data-k="${key}" data-i="${i}"><span class="n">${'ABCD'[i]}</span><span>${o}</span></div>`).join('')}</div>`;
+  else if (p.type === 'num') inner = `<div class="num-row"><input type="text" inputmode="decimal" id="num-${key}" placeholder="valor"><span style="color:var(--muted)">${p.unit || ''}</span><button class="btn" data-num="${key}">Comprobar</button></div>`;
+  else if (p.type === 'hot') inner = `<div style="font-size:13px;color:var(--muted)">Haz clic directamente sobre la imagen (pestaña <b style="color:var(--cyan)">${p.mode === 'rx' ? 'Radiografía' : p.mode === 'us' ? 'Ecografía' : 'Frotis'}</b>) para señalar el hallazgo.</div>`;
+  const reveal = solved ? `<div class="frag-reveal"><span class="big">${p.digit}</span><div><b style="color:var(--green)">Enigma resuelto.</b><br><span style="font-size:12.5px;color:var(--muted)">Dígito ${STATIONS.indexOf(key) + 1} del código de la farmacia.</span></div></div>` : '';
+  return `<div class="puzzle ${solved ? 'solved' : ''}" id="pz-${key}"><div class="ph"><b>${solved ? '✓ Enigma resuelto' : 'Enigma · ' + STATION_NAMES[key]}</b>${solved ? '' : `<button class="btn ghost" style="padding:5px 10px;font-size:12px" data-hint="${key}">${G.hintUsed[key] ? 'Ver pista' : 'Pista (−60 s)'}</button>`}</div><p class="q">${p.q}</p>${solved ? '' : inner}<div class="hint-line" id="hint-${key}" ${G.hintUsed[key] ? 'style="display:block"' : ''}>💡 ${p.hint}</div>${reveal}</div>`;
+}
+function bindPuzzle(root) {
+  root.querySelectorAll('.opt').forEach(el => el.onclick = () => answerMC(el.dataset.k, +el.dataset.i, el));
+  root.querySelectorAll('[data-num]').forEach(b => b.onclick = () => answerNum(b.dataset.num));
+  root.querySelectorAll('input[id^=num-]').forEach(inp => inp.onkeydown = e => { if (e.key === 'Enter') answerNum(inp.id.slice(4)); });
+  root.querySelectorAll('[data-hint]').forEach(b => b.onclick = () => useHint(b.dataset.hint, b));
+}
+function useHint(key, btn) {
+  if (!G.hintUsed[key]) { G.hintUsed[key] = true; G.hints++; penalty(HINT_PENALTY); toast('Pista desbloqueada: −60 s', 'bad'); }
+  $('hint-' + key).style.display = 'block'; $('hint-msg').textContent = '💡 ' + G.c.puzzles[key].hint; $('hint-msg').style.display = 'block';
+  if (btn) btn.textContent = 'Ver pista'; updateHUD();
+}
+function answerMC(key, i, el) {
+  if (G.solved[key]) return; const p = G.c.puzzles[key];
+  if (i === p.ok) { el.classList.add('right'); solvePuzzle(key); }
+  else { if (el.classList.contains('wrong')) return; el.classList.add('wrong'); G.errors++; penalty(ERR_PENALTY, 'Respuesta incorrecta: −45 s'); shakeModal(el.closest('.modal-bg').id); }
+}
+function answerNum(key) {
+  if (G.solved[key]) return; const p = G.c.puzzles[key]; const inp = $('num-' + key);
+  const v = parseFloat((inp.value || '').replace(',', '.').replace(/[^\d.\-]/g, ''));
+  if (isNaN(v)) { toast('Introduce un valor numérico', 'bad'); return; }
+  if (Math.abs(v - p.answer) <= p.tol) solvePuzzle(key);
+  else { G.errors++; penalty(ERR_PENALTY, 'Valor incorrecto: −45 s'); shakeModal(inp.closest('.modal-bg').id); inp.select(); }
+}
+function solvePuzzle(key) {
+  G.solved[key] = true; playSound('frag');
+  const f = $('frag-' + key); f.classList.add('pop'); setTimeout(() => f.classList.remove('pop'), 600);
+  const box = $('pz-' + key); if (box) box.outerHTML = puzzleBox(key);
+  $('hint-msg').style.display = 'none';
+  const codeSoFar = STATIONS.map(s => G.solved[s] ? G.c.puzzles[s].digit : '_').join(' '); drawKeypadTexture(codeSoFar);
+  updateHUD();
+  if (STATIONS.every(s => G.solved[s])) { setTimeout(() => { toast('Código completo. Ve a la farmacia y teclea los cuatro dígitos.', 'ok'); playSound('ok'); }, 500); }
+  else toast(`Dígito ${STATIONS.indexOf(key) + 1} obtenido: ${G.c.puzzles[key].digit}`, 'ok');
+}
+
+/* ---------- paciente ---------- */
+function renderPatient() {
+  const c = G.c;
+  $('patient-body').innerHTML = `
+    <div class="card accent"><div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--cyan);font-weight:800">Reseña</div><div style="font-weight:700;font-size:16px;margin-top:2px">${c.patient}</div><div style="color:var(--muted)">${c.signalment}</div></div>
+    <h4 class="sec">Anamnesis</h4><p style="margin:0;color:#d5deea">${c.history}</p>
+    <h4 class="sec">Constantes de triaje</h4><div class="vitals">${c.vitals.map(v => `<div class="vital ${v[2]}"><div class="k">${v[0]}</div><div class="v">${v[1]}</div></div>`).join('')}</div>
+    <h4 class="sec">Exploración física · pulsa cada región</h4><div class="regions">${c.exam.map((r, i) => `<div class="region" data-r="${i}"><div class="rk">${r[0]}<span class="tag">EXPLORAR</span></div><div class="rv">${r[1]}</div></div>`).join('')}</div>
+    ${puzzleBox('patient')}`;
+  const body = $('patient-body'); body.querySelectorAll('.region').forEach(el => el.onclick = () => { el.classList.add('open'); playSound('beep'); });
+  bindPuzzle(body); openModal('mb-patient');
+}
+
+/* ---------- monitor ---------- */
+function renderMonitor() {
+  const c = G.c, m = c.monitor;
+  $('monitor-body').innerHTML = `
+    <div class="mon-grid"><div class="mon g"><div class="k">FC lpm</div><div class="v">${m.hr}</div></div><div class="mon b"><div class="k">SpO₂ %</div><div class="v">${m.spo2}</div></div><div class="mon r"><div class="k">PANI mmHg</div><div class="v">${m.bp}</div></div><div class="mon r"><div class="k">PAM</div><div class="v">${m.map}</div></div><div class="mon y"><div class="k">FR rpm</div><div class="v">${m.rr}</div></div><div class="mon p"><div class="k">Tª ºC</div><div class="v">${m.temp.toFixed(1)}</div></div></div>
+    <div class="card" style="border-left:3px solid var(--green)"><b style="color:var(--green)">Lectura automática del trazado (DII, 25 mm/s):</b><p style="margin:6px 0 0;color:#d5deea">${c.ecg.desc}</p></div>
+    ${puzzleBox('monitor')}`;
+  bindPuzzle($('monitor-body')); openModal('mb-monitor');
+}
+
+/* ---------- laboratorio ---------- */
+function renderLab() {
+  const c = G.c;
+  $('lab-tabs').innerHTML = c.lab.map((t, i) => `<button class="tab ${i === G.labTab ? 'active' : ''}" data-t="${i}">${t.name}</button>`).join('');
+  $('lab-tabs').querySelectorAll('.tab').forEach(b => b.onclick = () => { G.labTab = +b.dataset.t; playSound('beep'); renderLabTab(); });
+  renderLabTab();
+  $('lab-puzzle').innerHTML = puzzleBox('lab'); bindPuzzle($('lab-puzzle')); openModal('mb-lab');
+}
+function renderLabTab() {
+  const t = G.c.lab[G.labTab];
+  $('lab-tabs').querySelectorAll('.tab').forEach(b => b.classList.toggle('active', +b.dataset.t === G.labTab));
+  $('lab-body').innerHTML = `<table class="lab"><thead><tr><th>Parámetro</th><th>Resultado</th><th>Referencia</th><th></th></tr></thead><tbody>${t.rows.map(r => `<tr><td>${r[0]}</td><td class="v">${r[1]}</td><td style="color:var(--muted)">${r[2]}</td><td>${r[3] === 'high' ? '<span class="f-high">▲ alto</span>' : r[3] === 'low' ? '<span class="f-low">▼ bajo</span>' : '<span class="f-ok">●</span>'}</td></tr>`).join('')}</tbody></table>`;
+}
+
+/* ---------- imagen ---------- */
+function renderImaging() {
+  const c = G.c; const modes = [['rx', 'Radiografía'], ['us', c.imaging.us.scene.startsWith('echo') ? 'Ecocardiografía' : 'Ecografía']]; if (c.imaging.smear) modes.push(['smear', 'Frotis']);
+  $('img-tabs').innerHTML = modes.map(m => `<button class="tab ${m[0] === G.imgMode ? 'active' : ''}" data-m="${m[0]}">${m[1]}</button>`).join('');
+  $('img-tabs').querySelectorAll('.tab').forEach(b => b.onclick = () => { G.imgMode = b.dataset.m; playSound('beep'); drawImagingMode(); });
+  drawImagingMode();
+  $('img-puzzle').innerHTML = puzzleBox('imaging'); bindPuzzle($('img-puzzle')); openModal('mb-imaging');
+}
+function drawImagingMode() {
+  const c = G.c, cv = $('img-canvas'), x = cv.getContext('2d', { willReadFrequently: true });
+  $('img-tabs').querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.m === G.imgMode));
+  $('img-marker').style.display = 'none';
+  if (G.imgMode === 'rx') { drawRX(x, cv.width, cv.height, c.imaging.rx); $('img-report').innerHTML = `<b style="color:var(--cyan)">Informe radiológico:</b> ${c.imaging.rx.report}`; }
+  else if (G.imgMode === 'us') { drawUS(x, cv.width, cv.height, c.imaging.us.scene, c.imaging.us.scene.startsWith('echo') ? 'Paraesternal derecha · eje largo' : c.imaging.us.scene === 'pericardial' ? 'Paraesternal derecha · eje corto' : 'Abdomen · sonda microconvex'); $('img-report').innerHTML = `<b style="color:var(--cyan)">Informe ecográfico:</b> ${c.imaging.us.report}`; }
+  else { drawSmear(x, cv.width, cv.height); $('img-report').innerHTML = `<b style="color:var(--cyan)">Frotis sanguíneo:</b> ${c.imaging.smear.report}`; }
+}
+function imagingClick(e) {
+  const cv = $('img-canvas'), r = cv.getBoundingClientRect(); const nx = (e.clientX - r.left) / r.width, ny = (e.clientY - r.top) / r.height;
+  const mk = $('img-marker'); mk.style.left = (nx * 100) + '%'; mk.style.top = (ny * 100) + '%'; mk.style.display = 'block'; mk.className = '';
+  const p = G.c.puzzles.imaging; if (G.solved.imaging) return;
+  if (G.imgMode !== p.mode) { toast('El hallazgo que buscas está en otra modalidad de imagen.'); return; }
+  if (Math.hypot(nx - p.x, (ny - p.y) * (9 / 16)) <= p.r) { mk.classList.add('ok'); solvePuzzle('imaging'); }
+  else { mk.classList.add('bad'); G.errors++; penalty(ERR_PENALTY, 'Ese no es el hallazgo clave: −45 s'); shakeModal('mb-imaging'); }
+}
+
+/* ---------- farmacia ---------- */
+function renderCabinet() {
+  ['stp-1', 'stp-2', 'stp-3'].forEach((id, i) => { const el = $(id); el.className = 'step' + (i + 1 < G.cabStep || G.finished ? ' done' : i + 1 === G.cabStep ? ' active' : ''); });
+  const body = $('cab-body');
+  if (G.finished) { body.innerHTML = `<div class="card" style="border-color:var(--green)"><b style="color:var(--green)">Tratamiento administrado.</b> ${G.c.patient} está estabilizándose. Puedes volver a leer el debriefing.</div><button class="btn green" id="btn-redebrief">Ver debriefing</button>`; $('btn-redebrief').onclick = () => showDebrief(); openModal('mb-cabinet'); return; }
+  if (G.cabStep === 1) {
+    const have = STATIONS.filter(s => G.solved[s]).length;
+    body.innerHTML = `<p style="margin:0 0 6px;color:var(--muted);font-size:13px">La farmacia de seguridad sólo se abre con el código de 4 dígitos que liberan los enigmas de las cuatro estaciones (orden: paciente · monitor · laboratorio · imagen). Tienes <b style="color:var(--cyan)">${have}/4</b>.</p>
+      <div class="keypad-wrap"><div class="code-screen" id="code-screen">${(G.code + '____').slice(0, 4)}</div><div class="keys">${['1', '2', '3', '4', '5', '6', '7', '8', '9', 'C', '0', 'OK'].map(k => `<button class="key ${k === 'C' ? 'c' : k === 'OK' ? 'ok' : ''}" data-key="${k}">${k}</button>`).join('')}</div></div>`;
+    body.querySelectorAll('.key').forEach(b => b.onclick = () => pressKey(b.dataset.key));
+  } else if (G.cabStep === 2) {
+    body.innerHTML = `<div class="card accent"><b style="color:var(--green)">Acceso concedido.</b> Antes de dispensar, el sistema exige registrar el diagnóstico.</div><p class="q" style="font-weight:600">${G.c.diagnosis.q}</p><div class="opts">${G.c.diagnosis.opts.map((o, i) => `<div class="opt" data-dx="${i}"><span class="n">${'ABCDE'[i]}</span><span>${o.t}<div class="why">${o.why || ''}</div></span></div>`).join('')}</div>`;
+    body.querySelectorAll('.opt').forEach(el => el.onclick = () => { const o = G.c.diagnosis.opts[+el.dataset.dx]; if (el.classList.contains('wrong')) return; if (o.ok) { el.classList.add('right'); playSound('ok'); G.cabStep = 3; setTimeout(renderCabinet, 600); } else { el.classList.add('wrong'); G.errors++; penalty(ERR_PENALTY, 'Diagnóstico incorrecto: −45 s'); shakeModal('mb-cabinet'); } });
+  } else {
+    body.innerHTML = `<div class="card accent"><b style="color:var(--cyan)">Diagnóstico registrado.</b> Selecciona la pauta terapéutica. Un error grave descompensa al paciente.</div><p class="q" style="font-weight:600">${G.c.treatment.q}</p><div class="opts">${G.c.treatment.opts.map((o, i) => `<div class="opt" data-tx="${i}"><span class="n">${'ABCDE'[i]}</span><span>${o.t}<div class="why">${o.why || ''}</div></span></div>`).join('')}</div>`;
+    body.querySelectorAll('.opt').forEach(el => el.onclick = () => { const o = G.c.treatment.opts[+el.dataset.tx]; if (el.classList.contains('wrong')) return; if (o.ok) { el.classList.add('right'); winCase(); } else { el.classList.add('wrong'); G.errors++; penalty(ERR_PENALTY, 'Error terapéutico: −45 s'); shakeModal('mb-cabinet'); } });
+  }
+  openModal('mb-cabinet');
+}
+function pressKey(k) {
+  const scr = $('code-screen'); playSound('beep');
+  if (k === 'C') G.code = '';
+  else if (k === 'OK') { checkCode(); return; }
+  else if (G.code.length < 4) G.code += k;
+  scr.textContent = (G.code + '____').slice(0, 4); scr.className = 'code-screen';
+  if (G.code.length === 4) setTimeout(checkCode, 250);
+}
+function checkCode() {
+  const scr = $('code-screen');
+  if (G.code === G.c.code) { scr.className = 'code-screen ok'; playSound('unlock'); drawKeypadTexture('OPEN', '#34d399'); G.cabStep = 2; setTimeout(renderCabinet, 700); }
+  else { scr.className = 'code-screen bad'; G.errors++; penalty(ERR_PENALTY, 'Código incorrecto: −45 s'); shakeModal('mb-cabinet'); setTimeout(() => { G.code = ''; scr.textContent = '____'; scr.className = 'code-screen'; }, 600); }
+}
+function winCase() {
+  G.running = false; G.finished = true; clearInterval(G.timerId); playSound('unlock');
+  const sc = scoreNow(); G.scores[G.idx] = sc;
+  if (!progress.best[G.c.id] || sc > progress.best[G.c.id]) progress.best[G.c.id] = sc; progress.done[G.c.id] = true; saveProgress();
+  doorLight.color.setHex(0x34d399); updateHUD();
+  setTimeout(() => showDebrief(true), 500);
+}
+function showDebrief(first) {
+  const c = G.c, sc = G.scores[G.idx] || scoreNow();
+  $('debrief-body').innerHTML = `<div class="score-grid"><div class="sc"><div class="k">Puntuación</div><div class="v">${sc}</div></div><div class="sc"><div class="k">Tiempo restante</div><div class="v">${fmtTime(G.time)}</div></div><div class="sc"><div class="k">Errores</div><div class="v" style="color:var(--red)">${G.errors}</div></div><div class="sc"><div class="k">Pistas</div><div class="v" style="color:var(--amber)">${G.hints}</div></div></div>${c.debrief}`;
+  const foot = $('debrief-foot'); foot.innerHTML = '';
+  const mk = (txt, cls, fn) => { const b = document.createElement('button'); b.className = 'btn ' + (cls || ''); b.textContent = txt; b.onclick = fn; foot.appendChild(b); };
+  mk('Volver a la sala', 'ghost', () => { closeModal('mb-debrief'); focusCamera('overview'); });
+  if (G.mode === 'campaign') { if (G.idx < CASES.length - 1) mk('Siguiente caso ▶', 'green', () => startCase(G.idx + 1, 'campaign')); else mk('Ver resultado de la campaña', 'green', showFinal); }
+  else { mk('Menú de casos', '', goMenu); if (G.idx < CASES.length - 1) mk('Siguiente caso ▶', 'green', () => startCase(G.idx + 1, 'single')); }
+  openModal('mb-debrief'); if (first) focusCamera('overview', 1.5);
+}
+function showFinal() {
+  const total = G.scores.reduce((a, b) => a + (b || 0), 0), max = CASES.length * 1100;
+  const pct = Math.round(total / max * 100); const grade = pct >= 85 ? 'Diplomado en Medicina Interna' : pct >= 70 ? 'Residente avanzado' : pct >= 50 ? 'Clínico competente' : 'Interno en formación';
+  $('final-body').innerHTML = `<div class="score-grid"><div class="sc"><div class="k">Total</div><div class="v">${total}</div></div><div class="sc"><div class="k">Sobre máximo</div><div class="v">${pct} %</div></div></div><p style="text-align:center;font-size:18px;font-weight:800;color:var(--green);margin:14px 0">${grade}</p><table class="lab">${CASES.map((c, i) => `<tr><td>${c.n}. ${c.title}</td><td class="v">${G.scores[i] || 0} pts</td></tr>`).join('')}</table>`;
+  openModal('mb-final');
+}
+
+/* ---------- interacción 3D ---------- */
+let raycaster, pointer, hovered = null, downPos = null, downTime = 0;
+function raycast(cx, cy) {
+  pointer.x = (cx / window.innerWidth) * 2 - 1; pointer.y = -(cy / window.innerHeight) * 2 + 1; raycaster.setFromCamera(pointer, camera);
+  const hits = raycaster.intersectObjects(SCENE.interactables, false); return hits.length ? hits[0].object : null;
+}
+function setupInput() {
+  raycaster = new THREE.Raycaster(); pointer = new THREE.Vector2();
+  const el = renderer.domElement; const cue = $('cue');
+  el.addEventListener('pointermove', e => {
+    if (e.pointerType === 'touch') return;
+    const o = raycast(e.clientX, e.clientY);
+    if (o && o.userData.station) { hovered = o; cue.style.display = 'block'; cue.style.left = e.clientX + 'px'; cue.style.top = e.clientY + 'px'; cue.textContent = STATION_NAMES[o.userData.station]; el.style.cursor = 'pointer'; }
+    else { hovered = null; cue.style.display = 'none'; el.style.cursor = 'grab'; }
+  });
+  el.addEventListener('pointerdown', e => { downPos = [e.clientX, e.clientY]; downTime = Date.now(); });
+  el.addEventListener('pointerup', e => {
+    if (!downPos) return; const d = Math.hypot(e.clientX - downPos[0], e.clientY - downPos[1]); downPos = null;
+    if (d > 8 || Date.now() - downTime > 600) return;
+    const o = raycast(e.clientX, e.clientY); if (o && o.userData.station) { playSound('beep'); openStation(o.userData.station); }
+  });
+  el.addEventListener('pointerleave', () => { cue.style.display = 'none'; });
+  document.querySelectorAll('.nav-btn').forEach(b => b.onclick = () => { playSound('beep'); const v = b.dataset.view; if (v === 'overview') focusCamera('overview'); else openStation(v); });
+  document.querySelectorAll('[data-close]').forEach(b => b.onclick = () => closeModal(b.dataset.close));
+  document.querySelectorAll('.modal-bg').forEach(m => m.addEventListener('pointerdown', e => { if (e.target === m && !['mb-debrief', 'mb-fail', 'mb-final', 'mb-confirm'].includes(m.id)) closeModal(m.id); }));
+  $('img-canvas').addEventListener('click', imagingClick);
+  $('btn-menu').onclick = () => { playSound('beep'); if (G.finished || !G.running) goMenu(); else openModal('mb-confirm'); };
+  $('btn-confirm-menu').onclick = goMenu; $('btn-fail-menu').onclick = goMenu; $('btn-fail-retry').onclick = () => startCase(G.idx, G.mode); $('btn-final-menu').onclick = goMenu;
+  $('btn-campaign').onclick = () => { playSound('beep'); G.scores = []; startCase(0, 'campaign'); };
+  $('btn-reset-progress').onclick = () => { progress = { best: {}, done: {} }; saveProgress(); renderCards(); toast('Progreso borrado'); };
+  window.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { document.querySelectorAll('.modal-bg.open').forEach(m => { if (!['mb-debrief', 'mb-fail', 'mb-final'].includes(m.id)) m.classList.remove('open'); }); }
+    if (!G.running || document.querySelector('.modal-bg.open')) return;
+    const map = { '1': 'patient', '2': 'monitor', '3': 'lab', '4': 'imaging', '5': 'cabinet', '0': 'overview' };
+    if (map[e.key]) { if (map[e.key] === 'overview') focusCamera('overview'); else openStation(map[e.key]); }
+  });
+  window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
+}
+
+/* ---------- bucle ---------- */
+let acc = 0;
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), .1); const now = clock.elapsedTime;
+  updateCamera(dt); controls.update();
+  if (G.c) {
+    ECG.step(dt);
+    acc += dt; if (acc > .05) { drawMonitorTexture(G.c); acc = 0; }
+    if ($('mb-monitor').classList.contains('open')) { const mc = $('ecg-modal-canvas'); mc.getContext('2d').drawImage(ECG.trace, 0, 0, mc.width, mc.height); }
+    if (SCENE.patient) { const rr = G.c.monitor.rr / 60; const b = 1 + Math.sin(now * Math.PI * 2 * rr) * .035; SCENE.patient.userData.chest.scale.set(1.1 * b, .9 * b, 1.1 * b); SCENE.patient.userData.torso.scale.set(b, 1, b); }
+    if (SCENE.doorPivot && G.finished && SCENE.doorPivot.rotation.y > -1.4) SCENE.doorPivot.rotation.y -= dt * 1.2;
+  }
+  const all = G.c && STATIONS.every(s => G.solved[s]) && !G.finished;
+  cabinetLight.intensity = (all ? 2.4 : 1.4) + Math.sin(now * (all ? 6 : 2.2)) * (all ? .9 : .3);
+  doorLight.intensity = .7 + Math.sin(now * 3) * .2;
+  if ($('hud').classList.contains('on')) projectLabels();
+  renderer.render(scene, camera);
+}
+
+/* ---------- init ---------- */
+function init() {
+  applyIcons(document);
+  if (typeof THREE === 'undefined') { $('loading').innerHTML = '<div style="color:var(--red);max-width:420px;text-align:center;line-height:1.5">No se ha podido cargar Three.js. Comprueba la conexión a internet y recarga la página.</div>'; return; }
+  try { buildScene(); } catch (e) { console.error(e); $('loading').innerHTML = '<div style="color:var(--red);max-width:420px;text-align:center;line-height:1.5">Tu navegador no ha podido iniciar WebGL. Prueba con Chrome, Edge o Firefox actualizados.</div>'; return; }
+  buildLabels(); setupInput(); renderCards();
+  drawKeypadTexture('_ _ _ _'); drawMonitorTexture(null); drawNegTexture(CASES[0]);
+  animate();
+  setTimeout(() => { $('loading').style.display = 'none'; }, 400);
+}
+if (document.readyState === 'complete') init(); else window.addEventListener('load', init);
+</script>
+</body>
+</html>

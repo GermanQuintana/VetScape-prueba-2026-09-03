@@ -1,0 +1,1184 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VetEscape 3D - Unidad de Cuidados Intensivos</title>
+    <style>
+        :root {
+            --bg-dark: #090d16;
+            --panel-bg: rgba(15, 23, 42, 0.94);
+            --primary: #00f0ff;
+            --primary-glow: rgba(0, 240, 255, 0.4);
+            --accent: #f43f5e;
+            --accent-green: #10b981;
+            --border: #334155;
+            --text-light: #f8fafc;
+            --text-muted: #94a3b8;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: var(--bg-dark);
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            color: var(--text-light);
+            user-select: none;
+        }
+
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            display: block;
+        }
+
+        /* HUD Superior */
+        #hud {
+            position: absolute;
+            top: 15px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .hud-card {
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--primary);
+            border-radius: 8px;
+            padding: 10px 18px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.6);
+            pointer-events: auto;
+            backdrop-filter: blur(8px);
+        }
+
+        #case-banner {
+            max-width: 500px;
+        }
+
+        #case-banner h3 {
+            margin: 0 0 4px 0;
+            font-size: 1rem;
+            color: var(--primary);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        #case-banner p {
+            margin: 0;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            line-height: 1.3;
+        }
+
+        #timer-box {
+            text-align: right;
+            border-left: none;
+            border-right: 4px solid var(--accent);
+        }
+
+        #timer {
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: var(--accent);
+            font-family: monospace;
+            letter-spacing: 2px;
+        }
+
+        /* Barra de Navegación Inferior */
+        #nav-bar {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            z-index: 10;
+            background: rgba(15, 23, 42, 0.88);
+            padding: 8px;
+            border-radius: 30px;
+            border: 1px solid var(--border);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            backdrop-filter: blur(8px);
+        }
+
+        .nav-btn {
+            background: transparent;
+            border: 1px solid transparent;
+            color: var(--text-muted);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .nav-btn:hover {
+            color: var(--primary);
+            border-color: var(--primary-glow);
+            background: rgba(0, 240, 255, 0.08);
+        }
+
+        .nav-btn.active {
+            background: var(--primary);
+            color: #000;
+            box-shadow: 0 0 12px var(--primary-glow);
+        }
+
+        /* Modales */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.78);
+            backdrop-filter: blur(5px);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-card {
+            background: var(--panel-bg);
+            border: 1px solid var(--primary);
+            box-shadow: 0 15px 40px rgba(0, 240, 255, 0.15), 0 0 50px rgba(0,0,0,0.9);
+            border-radius: 12px;
+            padding: 24px;
+            width: 90%;
+            max-width: 650px;
+            max-height: 85vh;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 12px;
+            margin-bottom: 16px;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 1.3rem;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .close-btn {
+            background: #1e293b;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-muted);
+            font-size: 1.2rem;
+            width: 32px;
+            height: 32px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        .close-btn:hover { color: #fff; background: var(--accent); border-color: var(--accent); }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+            margin: 12px 0;
+        }
+
+        .data-table th, .data-table td {
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            text-align: left;
+        }
+
+        .data-table th {
+            background: rgba(30, 41, 59, 0.8);
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        .flag-high { color: #f87171; font-weight: bold; }
+        .flag-low { color: #60a5fa; font-weight: bold; }
+
+        /* Teclado numérico del armario */
+        .keypad-display {
+            background: #000;
+            border: 2px solid var(--primary);
+            border-radius: 8px;
+            padding: 12px;
+            font-family: monospace;
+            font-size: 2rem;
+            text-align: center;
+            letter-spacing: 8px;
+            color: var(--primary);
+            box-shadow: inset 0 0 10px rgba(0, 240, 255, 0.3);
+            margin-bottom: 15px;
+        }
+
+        .keypad-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            max-width: 280px;
+            margin: 0 auto;
+        }
+
+        .keypad-btn {
+            background: #1e293b;
+            border: 1px solid var(--border);
+            color: #fff;
+            padding: 14px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .keypad-btn:hover {
+            background: #334155;
+            border-color: var(--primary);
+        }
+
+        .keypad-btn:active {
+            transform: scale(0.96);
+        }
+
+        /* Tarjetas selectoras de Triaje */
+        .case-card {
+            background: rgba(30, 41, 59, 0.5);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 14px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .case-card:hover {
+            border-color: var(--primary);
+            background: rgba(0, 240, 255, 0.05);
+            transform: translateY(-2px);
+        }
+
+        .case-tag {
+            display: inline-block;
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: 12px;
+            background: #334155;
+            color: var(--primary);
+            margin-bottom: 6px;
+            font-weight: bold;
+        }
+
+        .btn-action {
+            background: var(--primary);
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 15px;
+        }
+
+        .btn-action:hover {
+            box-shadow: 0 0 15px var(--primary-glow);
+            transform: scale(1.01);
+        }
+
+        .btn-secondary {
+            background: #334155;
+            color: #f8fafc;
+        }
+
+        .btn-secondary:hover {
+            background: #475569;
+            box-shadow: none;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+</head>
+<body>
+
+    <div id="canvas-container"></div>
+
+    <div id="hud">
+        <div class="hud-card" id="case-banner">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 id="hud-patient-id">Box de Urgencias #1</h3>
+                <button class="nav-btn" style="padding: 2px 8px; font-size: 0.75rem;" onclick="openModal('modal-case-select')">Cambiar Caso</button>
+            </div>
+            <p id="hud-patient-desc">Cargando paciente de triaje...</p>
+        </div>
+
+        <div class="hud-card" id="timer-box">
+            <div style="font-size: 0.75rem; color: var(--text-muted); font-weight: bold;">TIEMPO DE ESTABILIZACIÓN</div>
+            <div id="timer">12:00</div>
+        </div>
+    </div>
+
+    <div id="nav-bar">
+        <button class="nav-btn active" id="btn-nav-general" onclick="focusStation('general')">👁️ Sala General</button>
+        <button class="nav-btn" id="btn-nav-patient" onclick="focusStation('patient')">🐕 Paciente</button>
+        <button class="nav-btn" id="btn-nav-monitor" onclick="focusStation('monitor')">📈 Monitor ECG</button>
+        <button class="nav-btn" id="btn-nav-lab" onclick="focusStation('lab')">🧪 Laboratorio</button>
+        <button class="nav-btn" id="btn-nav-xray" onclick="focusStation('xray')">🩻 Negatoscopio</button>
+        <button class="nav-btn" id="btn-nav-cabinet" onclick="focusStation('cabinet')">💊 Armario Fármacos</button>
+    </div>
+
+    <div id="modal-case-select" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2>📋 Admisión de Urgencias: Seleccionar Paciente</h2>
+            </div>
+            <p style="color: var(--text-muted); font-size: 0.9rem;">
+                Selecciona un caso clínico ingresado. Recaba pruebas, calcula el valor fisiopatológico y desbloquea el botiquín.
+            </p>
+
+            <div class="case-card" onclick="selectCase(0)">
+                <span class="case-tag">BOX 1 - URGENCIA GRAVE</span>
+                <div style="font-weight: bold; color: #fff; margin-bottom: 4px;">Canino mestizo, 4 años, macho (19 kg)</div>
+                <div style="font-size: 0.85rem; color: #cbd5e1;"><strong>Motivo de ingreso:</strong> Colapso súbito tras debilidad progresiva de 48h. Vómitos esporádicos. Choque hipovolémico con bradicardia relativa injustificada.</div>
+            </div>
+
+            <div class="case-card" onclick="selectCase(1)">
+                <span class="case-tag">BOX 2 - ESTADO CRÍTICO</span>
+                <div style="font-weight: bold; color: #fff; margin-bottom: 4px;">Felino, Común Europeo, 9 años, hembra esterilizada (3.8 kg)</div>
+                <div style="font-size: 0.85rem; color: #cbd5e1;"><strong>Motivo de ingreso:</strong> Letargia extrema, anorexia de 72h y patrón respiratorio profundo acelerado (Kussmaul). Deshidratación severa (>10%) y aliento acetónico.</div>
+            </div>
+
+            <div class="case-card" onclick="selectCase(2)">
+                <span class="case-tag">BOX 3 - PRIORIDAD ALTA</span>
+                <div style="font-weight: bold; color: #fff; margin-bottom: 4px;">Canino, Golden Retriever, 2 años, macho (31 kg)</div>
+                <div style="font-size: 0.85rem; color: #cbd5e1;"><strong>Motivo de ingreso:</strong> Marcha atáxica aguda similar a embriaguez, sialorrea profusa, depresión neurológica progresiva e hipotermia tras acceso a garaje.</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-patient" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2>🩺 Exploración Clínica en Camilla</h2>
+                <button class="close-btn" onclick="closeModal('modal-patient')">&times;</button>
+            </div>
+            <div id="patient-data-content"></div>
+        </div>
+    </div>
+
+    <div id="modal-monitor" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2>📈 Monitor Multiparamétrico & Electrocardiografía</h2>
+                <button class="close-btn" onclick="closeModal('modal-monitor')">&times;</button>
+            </div>
+            <div style="background: #000; border: 1px solid #10b981; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+                <canvas id="ecg-modal-canvas" width="580" height="150" style="width: 100%; height: 150px;"></canvas>
+            </div>
+            <div id="monitor-metrics-content"></div>
+        </div>
+    </div>
+
+    <div id="modal-lab" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2>🧪 Laboratorio Clínico y Gasometría</h2>
+                <button class="close-btn" onclick="closeModal('modal-lab')">&times;</button>
+            </div>
+            <div id="lab-data-content"></div>
+        </div>
+    </div>
+
+    <div id="modal-xray" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2>🩻 Imagen Diagnóstica & POCUS</h2>
+                <button class="close-btn" onclick="closeModal('modal-xray')">&times;</button>
+            </div>
+            <div style="background: #050811; border: 2px solid #38bdf8; border-radius: 8px; padding: 15px; text-align: center; margin-bottom: 15px;">
+                <canvas id="xray-canvas" width="500" height="260" style="max-width: 100%; border-radius: 4px;"></canvas>
+            </div>
+            <div id="xray-report-content"></div>
+        </div>
+    </div>
+
+    <div id="modal-cabinet" class="modal-overlay">
+        <div class="modal-card" style="max-width: 440px;">
+            <div class="modal-header">
+                <h2>🔒 Armario de Farmacia Crítica</h2>
+                <button class="close-btn" onclick="closeModal('modal-cabinet')">&times;</button>
+            </div>
+            <p style="font-size: 0.85rem; color: var(--text-muted); text-align: center;">
+                Introduce el <strong>código fisiopatológico clave</strong> deducido de las pruebas diagnósticas.
+            </p>
+            <div class="keypad-display" id="keypad-readout">--</div>
+            <div class="keypad-grid">
+                <button class="keypad-btn" onclick="pressKey('1')">1</button>
+                <button class="keypad-btn" onclick="pressKey('2')">2</button>
+                <button class="keypad-btn" onclick="pressKey('3')">3</button>
+                <button class="keypad-btn" onclick="pressKey('4')">4</button>
+                <button class="keypad-btn" onclick="pressKey('5')">5</button>
+                <button class="keypad-btn" onclick="pressKey('6')">6</button>
+                <button class="keypad-btn" onclick="pressKey('7')">7</button>
+                <button class="keypad-btn" onclick="pressKey('8')">8</button>
+                <button class="keypad-btn" onclick="pressKey('9')">9</button>
+                <button class="keypad-btn" style="color: var(--accent);" onclick="pressKey('C')">C</button>
+                <button class="keypad-btn" onclick="pressKey('0')">0</button>
+                <button class="keypad-btn" style="color: var(--accent-green);" onclick="submitCode()">OK</button>
+            </div>
+            <div id="cabinet-feedback" style="margin-top: 15px; text-align: center; font-weight: bold; font-size: 0.9rem;"></div>
+            
+            <button class="btn-action btn-secondary" style="width: 100%;" onclick="closeModal('modal-cabinet')">
+                ⬅️ Salir y seguir revisando pruebas (ESC)
+            </button>
+        </div>
+    </div>
+
+    <div id="modal-treatment" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2 style="color: var(--accent-green);">🔓 Botiquín Abierto: Protocolo de Soporte Vital</h2>
+                <button class="close-btn" onclick="closeModal('modal-treatment')">&times;</button>
+            </div>
+            <p>Selecciona el protocolo farmacológico de estabilización para este paciente:</p>
+            <div id="treatment-options"></div>
+            <button class="btn-action" style="width: 100%;" onclick="confirmTreatment()">Administrar Tratamiento Inmediato</button>
+            <button class="btn-action btn-secondary" style="width: 100%;" onclick="closeModal('modal-treatment')">⬅️ Volver a la Sala</button>
+        </div>
+    </div>
+
+    <div id="modal-success" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h2 style="color: var(--accent-green);">🎉 ¡Paciente Estabilizado! Reto Superado</h2>
+            </div>
+            <div id="success-explanation"></div>
+            <button class="btn-action" style="width: 100%; margin-top: 20px;" onclick="openModal('modal-case-select'); closeModal('modal-success');">Atender Siguiente Caso de Urgencia</button>
+        </div>
+    </div>
+
+    <script>
+        /* ==========================================================
+           1. CASOS CLÍNICOS
+           ========================================================== */
+        const CLINICAL_CASES = [
+            {
+                id: 0,
+                boxName: "Box 1: Canino, Mestizo, 4 años (19 kg)",
+                triageBrief: "Choque hipovolémico refractario, letargia profunda y bradicardia descompensatoria.",
+                solutionCode: "19", // Ratio Na/K: 125 / 6.5 = 19.2 -> 19
+                codeHint: "Calcular el Ratio Na⁺ / K⁺ (redondeado al entero).",
+                physical: `
+                    <p><strong>Inspección General:</strong> Decúbito lateral flácido, respuesta deprimida a estímulos.</p>
+                    <table class="data-table">
+                        <tr><th>Parámetro</th><th>Valor Hallado</th><th>Referencia Canina</th></tr>
+                        <tr><td>Frecuencia Cardíaca</td><td class="flag-low">44 lpm (Bradicardia severa)</td><td>70 - 130 lpm</td></tr>
+                        <tr><td>Frecuencia Respiratoria</td><td>20 rpm (Superficial)</td><td>15 - 30 rpm</td></tr>
+                        <tr><td>Temperatura</td><td class="flag-low">36.6 ºC</td><td>38.0 - 39.2 ºC</td></tr>
+                        <tr><td>Presión Sistólica</td><td class="flag-low">65 mmHg (Hipotensión severa)</td><td>110 - 140 mmHg</td></tr>
+                        <tr><td>Relleno Capilar</td><td class="flag-high">> 3.5 segundos</td><td>< 2 segundos</td></tr>
+                        <tr><td>Mucosas</td><td>Pálidas, secas y frías</td><td>Rosadas y húmedas</td></tr>
+                    </table>
+                `,
+                ecgType: "addison",
+                ecgMetrics: `<p><strong>Interpretación ECG:</strong> Ausencia de ondas P (paro sinusal auricular), ondas T altas, estrechas y picudas ("en tienda de campaña"). Típico de cardiotoxicidad por hipercalemia severa.</p>`,
+                lab: `
+                    <table class="data-table">
+                        <tr><th>Analito</th><th>Resultado</th><th>Rango Ref.</th></tr>
+                        <tr><td>Sodio ($Na^+$)</td><td class="flag-low">125 mEq/L</td><td>140 - 152</td></tr>
+                        <tr><td>Potasio ($K^+$)</td><td class="flag-high">6.5 mEq/L</td><td>3.6 - 5.3</td></tr>
+                        <tr><td>Cloro ($Cl^-$)</td><td class="flag-low">92 mEq/L</td><td>105 - 118</td></tr>
+                        <tr><td>Glucosa</td><td class="flag-low">58 mg/dL</td><td>70 - 110</td></tr>
+                        <tr><td>Urea / BUN</td><td class="flag-high">98 mg/dL</td><td>15 - 40</td></tr>
+                        <tr><td>Creatinina</td><td class="flag-high">2.9 mg/dL</td><td>0.6 - 1.4</td></tr>
+                    </table>
+                    <p style="background: rgba(0,240,255,0.08); padding: 10px; border-left: 3px solid var(--primary);">
+                        <strong>Clave del Armario:</strong> El código corresponde al cociente <strong>Sodio ($Na^+$) / Potasio ($K^+$)</strong> redondeado.
+                    </p>
+                `,
+                xrayReport: `
+                    <p><strong>Estudio Radiográfico Torácico:</strong></p>
+                    <ul>
+                        <li>Silueta cardíaca visiblemente reducida (Microcardia compatible con hipovolemia crítica severa).</li>
+                        <li>Hipovascularización pulmonar difusa y vena cava caudal estrechada.</li>
+                    </ul>
+                `,
+                treatments: [
+                    { id: "correct", text: "Suero Fisiológico NaCl 0.9% en bolo de choque + Gluconato de Calcio al 10% IV lento + Fosfato sódico de Dexametasona IV" },
+                    { id: "wrong1", text: "Ringer Lactato con suplemento de KCl a 20 mEq/L + Atropina en bolo IV" },
+                    { id: "wrong2", text: "Suero Salino Hipertónico 7.5% + Furosemida en bolo IV + Metilprednisolona oral" },
+                    { id: "wrong3", text: "Dextrosa 5% continua + Dobutamina en infusión continua sin corticoterapia" }
+                ],
+                resolution: `
+                    <h3>Diagnóstico Final: Crisis Addisoniana Aguda (Hipoadrenocorticismo Primario Típico)</h3>
+                    <p>La combinación de hiponatremia, hiperpotasemia con ratio $Na^+/K^+ < 24$ ($125/6.5 = 19.2$), bradicardia e hipotensión con microcardia confirma el cuadro.</p>
+                    <p><strong>Eficacia terapéutica:</strong> El NaCl 0.9% restaura la volemia sin aportar potasio, el gluconato cálcico protege el miocardio frente a arritmias letales y la dexametasona no interfiere con el test diagnóstico de estimulación con ACTH.</p>
+                `
+            },
+            {
+                id: 1,
+                boxName: "Box 2: Felino, DSH, 9 años (3.8 kg)",
+                triageBrief: "Depresión metabólica grave, respiración acidótica acelerada y deshidratación severa.",
+                solutionCode: "28", // Anion gap: (140 + 4.8) - (107 + 10) = 144.8 - 117 = 27.8 -> 28
+                codeHint: "Calcular el Anion Gap: (Na⁺ + K⁺) - (Cl⁻ + HCO₃⁻) redondeado.",
+                physical: `
+                    <p><strong>Inspección General:</strong> Estupor, aliento cetónico, pliegue cutáneo persistente (>3 s), enoftalmos acentuado.</p>
+                    <table class="data-table">
+                        <tr><th>Parámetro</th><th>Valor Hallado</th><th>Referencia Felina</th></tr>
+                        <tr><td>Frecuencia Cardíaca</td><td class="flag-high">230 lpm (Taquicardia sinusal)</td><td>140 - 200 lpm</td></tr>
+                        <tr><td>Frecuencia Respiratoria</td><td class="flag-high">52 rpm (Respiración de Kussmaul)</td><td>20 - 40 rpm</td></tr>
+                        <tr><td>Temperatura</td><td class="flag-low">36.9 ºC</td><td>38.1 - 39.2 ºC</td></tr>
+                        <tr><td>Presión Media</td><td class="flag-low">60 mmHg</td><td>80 - 120 mmHg</td></tr>
+                    </table>
+                `,
+                ecgType: "tachycardia",
+                ecgMetrics: `<p><strong>Interpretación ECG:</strong> Taquicardia sinusal regular estrecha (230 lpm). Sin anomalías agudas en la repolarización.</p>`,
+                lab: `
+                    <table class="data-table">
+                        <tr><th>Analito</th><th>Resultado</th><th>Rango Ref.</th></tr>
+                        <tr><td>Glucosa</td><td class="flag-high">485 mg/dL</td><td>70 - 150</td></tr>
+                        <tr><td>Sodio ($Na^+$)</td><td>140 mEq/L</td><td>144 - 156</td></tr>
+                        <tr><td>Potasio ($K^+$)</td><td>4.8 mEq/L</td><td>3.8 - 5.3</td></tr>
+                        <tr><td>Cloro ($Cl^-$)</td><td>107 mEq/L</td><td>115 - 130</td></tr>
+                        <tr><td>Bicarbonato ($HCO_3^-$)</td><td class="flag-low">10 mEq/L</td><td>17 - 24</td></tr>
+                        <tr><td>pH venoso</td><td class="flag-low">7.12</td><td>7.28 - 7.41</td></tr>
+                        <tr><td>Cetonas</td><td class="flag-high">++++ (Acetoacetato y β-hidroxibutirato)</td><td>Negativo</td></tr>
+                    </table>
+                    <p style="background: rgba(0,240,255,0.08); padding: 10px; border-left: 3px solid var(--primary);">
+                        <strong>Clave del Armario:</strong> El código corresponde al <strong>Anion Gap</strong> calculado: <br>
+                        <code>(Na⁺ + K⁺) - (Cl⁻ + HCO₃⁻)</code> redondeado.
+                    </p>
+                `,
+                xrayReport: `
+                    <p><strong>Ecografía POCUS Abdominal:</strong></p>
+                    <ul>
+                        <li>Hepatomegalia difusa con hiperecogenicidad compatible con lipidosis secundaria.</li>
+                        <li>Vejiga repleta de orina: Glucosuria 4+, Cetonuria 4+.</li>
+                    </ul>
+                `,
+                treatments: [
+                    { id: "correct", text: "Fluidoterapia NaCl 0.9% con suplemento preventivo de KCl/KPO4 + Infusión continua de Insulina Regular a dosis baja tras reexpansión" },
+                    { id: "wrong1", text: "Bolo IV rápido de Insulina Glargina + Bicarbonato Sódico al 8.4% en bolo sin fluidos previos" },
+                    { id: "wrong2", text: "Solución Ringer con Dextrosa al 5% inmediata + Dexametasona IV" },
+                    { id: "wrong3", text: "Diuréticos osmóticos (Manitol) + Glucagón en perfusión continua" }
+                ],
+                resolution: `
+                    <h3>Diagnóstico Final: Cetoacidosis Diabética Severa (CAD)</h3>
+                    <p>El Anion Gap calculado fue de <strong>28</strong> (Normal: 12-20), lo que confirma acidosis metabólica por acumulación de cetoácidos circulantes no medidos.</p>
+                    <p><strong>Eficacia terapéutica:</strong> Es vital reexpandir volumen y asegurar la suplementación precoz de potasio antes de la insulinoterapia para evitar hipocalemias fulminantes inducidas por el trasvase intracelular de potasio.</p>
+                `
+            },
+            {
+                id: 2,
+                boxName: "Box 3: Canino, Golden Retriever, 2 años (31 kg)",
+                triageBrief: "Ataxia neuro-metabólica sobreaguda, hipotermia, sialorrea y sospecha de tóxico domiciliario.",
+                solutionCode: "40", // Brecha osmolal: 345 - (2*140 + 85/18 + 56/2.8 = 304.7) = 345 - 305 = 40
+                codeHint: "Calcular la Brecha Osmolal: Osm Medida - Osm Calculada [2·Na + (Gluc/18) + (BUN/2.8)].",
+                physical: `
+                    <p><strong>Inspección General:</strong> Estupor comatoso progresivo, ataxia sensorial grave, midriasis pupilar bilateral poco reactiva.</p>
+                    <table class="data-table">
+                        <tr><th>Parámetro</th><th>Valor Hallado</th><th>Referencia Canina</th></tr>
+                        <tr><td>Frecuencia Cardíaca</td><td>105 lpm (Rítmico)</td><td>70 - 120 lpm</td></tr>
+                        <tr><td>Frecuencia Respiratoria</td><td class="flag-high">45 rpm (Hiperventilación)</td><td>15 - 30 rpm</td></tr>
+                        <tr><td>Temperatura</td><td class="flag-low">35.8 ºC (Hipotermia severa)</td><td>38.0 - 39.2 ºC</td></tr>
+                    </table>
+                `,
+                ecgType: "normal",
+                ecgMetrics: `<p><strong>Interpretación ECG:</strong> Ritmo sinusal regular a 105 lpm sin trastornos agudos de conducción.</p>`,
+                lab: `
+                    <table class="data-table">
+                        <tr><th>Analito</th><th>Resultado</th><th>Rango Ref.</th></tr>
+                        <tr><td>Osmolalidad Sérica Medida</td><td class="flag-high">345 mOsm/kg</td><td>290 - 310</td></tr>
+                        <tr><td>Sodio ($Na^+$)</td><td>140 mEq/L</td><td>140 - 152</td></tr>
+                        <tr><td>Glucosa</td><td>85 mg/dL</td><td>70 - 110</td></tr>
+                        <tr><td>BUN (Nitrógeno Ureico)</td><td class="flag-high">56 mg/dL</td><td>10 - 28</td></tr>
+                        <tr><td>Sedimento Urinario</td><td class="flag-high">Abundantes cristales de oxalato cálcico monohidratado (agujas)</td><td>Ausentes</td></tr>
+                    </table>
+                    <p style="background: rgba(0,240,255,0.08); padding: 10px; border-left: 3px solid var(--primary);">
+                        <strong>Clave del Armario:</strong> Brecha Osmolal = <code>Osm Medida - Osm Calculada</code>.<br>
+                        <code>Osm Calculada = (2 × Na⁺) + (Glucosa / 18) + (BUN / 2.8)</code>. Código = Brecha redondeada.
+                    </p>
+                `,
+                xrayReport: `
+                    <p><strong>Ecografía POCUS Renal:</strong></p>
+                    <ul>
+                        <li>Corteza renal hiperecogénica marcada ("Signo del halo medular brillante").</li>
+                        <li>Orina en vejiga con fluorescencia positiva bajo luz ultravioleta (Wood).</li>
+                    </ul>
+                `,
+                treatments: [
+                    { id: "correct", text: "Inhibición enzimática competitiva con Fomepizol (4-MP) IV + Fluidoterapia poliúrica de apoyo metabólico" },
+                    { id: "wrong1", text: "Bolo de Furosemida 5 mg/kg + Dexametasona IV para inducir desinflamación renal" },
+                    { id: "wrong2", text: "Sulfato de Atropina IV + Carbón activado en paciente en estupor profundo" },
+                    { id: "wrong3", text: "Solución de Aminoácidos al 10% + Vitamina K1 subcutánea" }
+                ],
+                resolution: `
+                    <h3>Diagnóstico Final: Intoxicación Sobreaguda por Etilenglicol (Fase Neuro-metabólica)</h3>
+                    <p>La Brecha Osmolal (*Osmolal Gap*) de <strong>40 mOsm/kg</strong> junto con la cristaluria monohidratada y la fluorescencia confirma la intoxicación precoz.</p>
+                    <p><strong>Eficacia terapéutica:</strong> El Fomepizol inhibe a la alcohol deshidrogenasa (ADH), deteniendo la producción de metabolitos nefrotóxicos letales (glicolato y oxalato).</p>
+                `
+            }
+        ];
+
+        let currentCase = CLINICAL_CASES[0];
+        let cabinetUnlocked = false;
+        let enteredCode = "";
+        let timerSeconds = 12 * 60;
+        let timerInterval = null;
+
+        /* ==========================================================
+           2. THREE.JS Y ESCENA 3D
+           ========================================================== */
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0a0e17);
+        scene.fog = new THREE.FogExp2(0x0a0e17, 0.04);
+
+        const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(0, 4.5, 7.5);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.1;
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.maxPolarAngle = Math.PI / 2 - 0.05;
+        controls.minDistance = 1.8;
+        controls.maxDistance = 11;
+        controls.target.set(0, 1.2, 0);
+
+        // Iluminación
+        const ambientLight = new THREE.AmbientLight(0xdbeafe, 0.35);
+        scene.add(ambientLight);
+
+        const examLight = new THREE.SpotLight(0xffffff, 2.5, 14, Math.PI / 4.5, 0.3, 1.2);
+        examLight.position.set(0, 5, 0);
+        examLight.castShadow = true;
+        scene.add(examLight);
+
+        const cabinetSpot = new THREE.PointLight(0x00f0ff, 3.5, 7);
+        cabinetSpot.position.set(3.4, 2.5, -4.0);
+        scene.add(cabinetSpot);
+
+        const fillLight = new THREE.PointLight(0x38bdf8, 0.8, 12);
+        fillLight.position.set(-4, 3, 2);
+        scene.add(fillLight);
+
+        // Geometría de la Sala
+        const roomGroup = new THREE.Group();
+        const floorCanvas = document.createElement('canvas');
+        floorCanvas.width = 512; floorCanvas.height = 512;
+        const fCtx = floorCanvas.getContext('2d');
+        fCtx.fillStyle = '#111827'; fCtx.fillRect(0,0,512,512);
+        fCtx.strokeStyle = '#1f2937'; fCtx.lineWidth = 4;
+        fCtx.strokeRect(0,0,512,512);
+        const floorTex = new THREE.CanvasTexture(floorCanvas);
+        floorTex.wrapS = THREE.RepeatWrapping; floorTex.wrapT = THREE.RepeatWrapping;
+        floorTex.repeat.set(8, 8);
+
+        const floor = new THREE.Mesh(
+            new THREE.PlaneGeometry(16, 16),
+            new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.3, metalness: 0.2 })
+        );
+        floor.rotation.x = -Math.PI / 2;
+        floor.receiveShadow = true;
+        roomGroup.add(floor);
+
+        const wallMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.8 });
+        const backWall = new THREE.Mesh(new THREE.PlaneGeometry(16, 6), wallMat);
+        backWall.position.set(0, 3, -5.5);
+        backWall.receiveShadow = true;
+        roomGroup.add(backWall);
+
+        const leftWall = new THREE.Mesh(new THREE.PlaneGeometry(16, 6), wallMat);
+        leftWall.position.set(-8, 3, 2.5);
+        leftWall.rotation.y = Math.PI / 2;
+        roomGroup.add(leftWall);
+        scene.add(roomGroup);
+
+        // Estaciones de Trabajo
+        const interactables = [];
+        function registerInteractable(mesh, stationId) {
+            mesh.userData = { stationId: stationId };
+            interactables.push(mesh);
+        }
+
+        // Mesa y Paciente
+        const tableGroup = new THREE.Group();
+        const tableBase = new THREE.Mesh(
+            new THREE.BoxGeometry(2.6, 0.12, 1.3),
+            new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.8, roughness: 0.15 })
+        );
+        tableBase.position.set(0, 1.2, 0);
+        tableBase.castShadow = true;
+        tableBase.receiveShadow = true;
+        tableGroup.add(tableBase);
+
+        const legGeo = new THREE.CylinderGeometry(0.08, 0.08, 1.2, 16);
+        const legMat = new THREE.MeshStandardMaterial({ color: 0x64748b, metalness: 0.9, roughness: 0.2 });
+        [[-1.1, -0.5], [1.1, -0.5], [-1.1, 0.5], [1.1, 0.5]].forEach(pos => {
+            const leg = new THREE.Mesh(legGeo, legMat);
+            leg.position.set(pos[0], 0.6, pos[1]);
+            leg.castShadow = true;
+            tableGroup.add(leg);
+        });
+
+        const patientMesh = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.24, 0.28, 1.1, 16),
+            new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.9 })
+        );
+        patientMesh.rotation.z = Math.PI / 2;
+        patientMesh.position.set(0, 1.42, 0);
+        patientMesh.castShadow = true;
+        registerInteractable(patientMesh, 'patient');
+        tableGroup.add(patientMesh);
+        scene.add(tableGroup);
+
+        // Monitor ECG
+        const monitorStand = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.2), legMat);
+        monitorStand.position.set(-1.8, 1.1, -0.8);
+        scene.add(monitorStand);
+
+        const monitorCanvas = document.createElement('canvas');
+        monitorCanvas.width = 512; monitorCanvas.height = 320;
+        const mCtx = monitorCanvas.getContext('2d');
+        const monitorTexture = new THREE.CanvasTexture(monitorCanvas);
+
+        const monitorScreen = new THREE.Mesh(
+            new THREE.BoxGeometry(1.0, 0.65, 0.08),
+            new THREE.MeshStandardMaterial({ map: monitorTexture, emissive: 0xffffff, emissiveMap: monitorTexture, emissiveIntensity: 0.9 })
+        );
+        monitorScreen.position.set(-1.8, 2.0, -0.8);
+        monitorScreen.rotation.y = Math.PI / 6;
+        registerInteractable(monitorScreen, 'monitor');
+        scene.add(monitorScreen);
+
+        // Laboratorio
+        const labDesk = new THREE.Mesh(
+            new THREE.BoxGeometry(2.0, 1.0, 1.0),
+            new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.6 })
+        );
+        labDesk.position.set(-4.5, 0.5, -4.5);
+        scene.add(labDesk);
+
+        const labScreen = new THREE.Mesh(
+            new THREE.BoxGeometry(1.2, 0.8, 0.08),
+            new THREE.MeshStandardMaterial({ color: 0x0284c7, emissive: 0x0369a1, emissiveIntensity: 0.7 })
+        );
+        labScreen.position.set(-4.5, 1.4, -4.6);
+        registerInteractable(labScreen, 'lab');
+        scene.add(labScreen);
+
+        // Negatoscopio
+        const xrayScreen = new THREE.Mesh(
+            new THREE.BoxGeometry(1.6, 1.1, 0.06),
+            new THREE.MeshStandardMaterial({ color: 0x0f172a, emissive: 0x38bdf8, emissiveIntensity: 0.6 })
+        );
+        xrayScreen.position.set(-0.5, 2.8, -5.45);
+        registerInteractable(xrayScreen, 'xray');
+        scene.add(xrayScreen);
+
+        const xrayFrame = new THREE.Mesh(
+            new THREE.BoxGeometry(1.7, 1.2, 0.04),
+            new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8 })
+        );
+        xrayFrame.position.set(-0.5, 2.8, -5.48);
+        scene.add(xrayFrame);
+
+        // Armario de Farmacia
+        const cabinetGroup = new THREE.Group();
+        cabinetGroup.position.set(3.6, 0, -4.6);
+
+        const cabBody = new THREE.Mesh(
+            new THREE.BoxGeometry(2.2, 3.4, 0.8),
+            new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.7, roughness: 0.25 })
+        );
+        cabBody.position.set(0, 1.7, 0);
+        cabinetGroup.add(cabBody);
+
+        const cabInterior = new THREE.Mesh(
+            new THREE.BoxGeometry(1.9, 2.8, 0.6),
+            new THREE.MeshStandardMaterial({ color: 0x020617, emissive: 0x00f0ff, emissiveIntensity: 0.2 })
+        );
+        cabInterior.position.set(0, 1.7, 0.1);
+        cabinetGroup.add(cabInterior);
+
+        const shelfGeo = new THREE.BoxGeometry(1.85, 0.04, 0.55);
+        const shelfMat = new THREE.MeshPhysicalMaterial({ color: 0xffffff, transparent: true, opacity: 0.65, transmission: 0.8, roughness: 0.1 });
+        [1.0, 1.7, 2.4].forEach(y => {
+            const shelf = new THREE.Mesh(shelfGeo, shelfMat);
+            shelf.position.set(0, y, 0.1);
+            cabinetGroup.add(shelf);
+        });
+
+        const vialGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.18, 12);
+        const colors = [0x00f0ff, 0x10b981, 0xf43f5e, 0xfacc15];
+        for (let i = 0; i < 18; i++) {
+            const vColor = colors[i % colors.length];
+            const vial = new THREE.Mesh(vialGeo, new THREE.MeshStandardMaterial({ color: vColor, emissive: vColor, emissiveIntensity: 0.9 }));
+            const shelfIdx = Math.floor(i / 6);
+            vial.position.set(-0.7 + (i % 6) * 0.28, 1.1 + (shelfIdx * 0.7), 0.1);
+            cabinetGroup.add(vial);
+        }
+
+        const glassDoor = new THREE.Mesh(
+            new THREE.BoxGeometry(1.9, 2.9, 0.05),
+            new THREE.MeshPhysicalMaterial({ color: 0x00f0ff, transparent: true, opacity: 0.35, roughness: 0.1, metalness: 0.1 })
+        );
+        glassDoor.position.set(0, 1.7, 0.42);
+        cabinetGroup.add(glassDoor);
+
+        const lockPanel = new THREE.Mesh(
+            new THREE.BoxGeometry(0.35, 0.55, 0.08),
+            new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0x00f0ff, emissiveIntensity: 0.6 })
+        );
+        lockPanel.position.set(0.7, 1.7, 0.48);
+        cabinetGroup.add(lockPanel);
+
+        registerInteractable(cabBody, 'cabinet');
+        registerInteractable(glassDoor, 'cabinet');
+        registerInteractable(lockPanel, 'cabinet');
+        scene.add(cabinetGroup);
+
+        /* ==========================================================
+           3. DIBUJADO DE ECG Y RAYOS X
+           ========================================================== */
+        let ecgOffset = 0;
+        function drawMonitorTexture() {
+            mCtx.fillStyle = '#050b14';
+            mCtx.fillRect(0, 0, 512, 320);
+
+            mCtx.strokeStyle = 'rgba(16, 185, 129, 0.15)';
+            mCtx.lineWidth = 1;
+            for (let x = 0; x < 512; x += 20) { mCtx.beginPath(); mCtx.moveTo(x, 0); mCtx.lineTo(x, 320); mCtx.stroke(); }
+            for (let y = 0; y < 320; y += 20) { mCtx.beginPath(); mCtx.moveTo(0, y); mCtx.lineTo(512, y); mCtx.stroke(); }
+
+            mCtx.fillStyle = '#10b981';
+            mCtx.font = 'bold 24px monospace';
+            mCtx.fillText('DERIVACIÓN II', 20, 35);
+            mCtx.fillStyle = '#38bdf8';
+            mCtx.fillText(`SpO2: 96%`, 360, 35);
+
+            mCtx.strokeStyle = '#00f0ff';
+            mCtx.lineWidth = 3;
+            mCtx.beginPath();
+
+            const centerY = 160;
+            for (let x = 0; x < 512; x++) {
+                const pos = (x + ecgOffset) % 180;
+                let y = centerY;
+
+                if (currentCase.ecgType === 'addison') {
+                    if (pos > 70 && pos < 80) y -= 55;
+                    else if (pos > 80 && pos < 90) y += 20;
+                    else if (pos > 110 && pos < 140) y -= 45 * Math.sin((pos - 110) * Math.PI / 30);
+                } else if (currentCase.ecgType === 'tachycardia') {
+                    const fastPos = (x + ecgOffset * 2) % 90;
+                    if (fastPos > 20 && fastPos < 30) y -= 12;
+                    else if (fastPos > 35 && fastPos < 45) y -= 60;
+                    else if (fastPos > 55 && fastPos < 75) y -= 20;
+                } else {
+                    if (pos > 40 && pos < 50) y -= 15;
+                    else if (pos > 65 && pos < 75) y -= 65;
+                    else if (pos > 95 && pos < 120) y -= 22;
+                }
+
+                if (x === 0) mCtx.moveTo(x, y);
+                else mCtx.lineTo(x, y);
+            }
+            mCtx.stroke();
+            monitorTexture.needsUpdate = true;
+        }
+
+        function drawXrayCanvas() {
+            const c = document.getElementById('xray-canvas');
+            const ctx = c.getContext('2d');
+            ctx.fillStyle = '#020617';
+            ctx.fillRect(0, 0, 500, 260);
+            ctx.strokeStyle = 'rgba(56, 189, 248, 0.4)';
+            ctx.lineWidth = 3;
+
+            if (currentCase.id === 0) {
+                ctx.beginPath();
+                ctx.arc(230, 130, 32, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.fillStyle = 'rgba(56, 189, 248, 0.15)';
+                ctx.fill();
+                ctx.fillStyle = '#fff';
+                ctx.font = '14px sans-serif';
+                ctx.fillText('Hallazgo: Silueta Cardíaca Reducida (Microcardia)', 40, 40);
+            } else if (currentCase.id === 1) {
+                ctx.beginPath();
+                ctx.ellipse(250, 140, 110, 55, 0, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.fillStyle = 'rgba(16, 185, 129, 0.15)';
+                ctx.fill();
+                ctx.fillStyle = '#fff';
+                ctx.font = '14px sans-serif';
+                ctx.fillText('Hallazgo: Hepatomegalia Marcada y Ecogenicidad Difusa', 40, 40);
+            } else {
+                ctx.beginPath();
+                ctx.ellipse(240, 130, 75, 45, 0, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.strokeStyle = '#f43f5e';
+                ctx.lineWidth = 4;
+                ctx.strokeRect(190, 110, 100, 40);
+                ctx.fillStyle = '#fff';
+                ctx.font = '14px sans-serif';
+                ctx.fillText('Hallazgo: Signo del Anillo Medular Renal Hiperecoico', 40, 40);
+            }
+        }
+
+        /* ==========================================================
+           4. CONTROL DE CÁMARA Y NAVEGACIÓN
+           ========================================================== */
+        const cameraPositions = {
+            general: { pos: new THREE.Vector3(0, 4.5, 7.5), target: new THREE.Vector3(0, 1.2, 0) },
+            patient: { pos: new THREE.Vector3(0, 2.6, 2.2), target: new THREE.Vector3(0, 1.35, 0) },
+            monitor: { pos: new THREE.Vector3(-1.8, 2.1, 0.4), target: new THREE.Vector3(-1.8, 2.0, -0.8) },
+            lab:     { pos: new THREE.Vector3(-4.5, 2.0, -2.8), target: new THREE.Vector3(-4.5, 1.4, -4.6) },
+            xray:    { pos: new THREE.Vector3(-0.5, 2.8, -3.2), target: new THREE.Vector3(-0.5, 2.8, -5.45) },
+            cabinet: { pos: new THREE.Vector3(3.6, 2.2, -2.4), target: new THREE.Vector3(3.6, 1.9, -4.6) }
+        };
+
+        function focusStation(stationKey) {
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            const activeBtn = document.getElementById(`btn-nav-${stationKey}`);
+            if (activeBtn) activeBtn.classList.add('active');
+
+            const config = cameraPositions[stationKey];
+            if (!config) return;
+
+            new TWEEN.Tween(camera.position)
+                .to(config.pos, 850)
+                .easing(TWEEN.Easing.Cubic.Out)
+                .start();
+
+            new TWEEN.Tween(controls.target)
+                .to(config.target, 850)
+                .easing(TWEEN.Easing.Cubic.Out)
+                .start();
+        }
+
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        window.addEventListener('click', (e) => {
+            if (document.querySelector('.modal-overlay[style*="display: flex"]')) return;
+
+            mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+
+            const hits = raycaster.intersectObjects(interactables, true);
+            if (hits.length > 0) {
+                let obj = hits[0].object;
+                while (obj && !obj.userData.stationId && obj.parent) obj = obj.parent;
+                if (obj && obj.userData.stationId) {
+                    triggerStationModal(obj.userData.stationId);
+                }
+            }
+        });
+
+        function triggerStationModal(stationId) {
+            focusStation(stationId);
+            setTimeout(() => {
+                if (stationId === 'cabinet') {
+                    if (!cabinetUnlocked) openModal('modal-cabinet');
+                    else openModal('modal-treatment');
+                } else {
+                    openModal(`modal-${stationId}`);
+                }
+            }, 300);
+        }
+
+        /* ==========================================================
+           5. CONTROL DE MODALES Y ESCAPE / RETROCESO
+           ========================================================== */
+        function openModal(id) {
+            const modal = document.getElementById(id);
+            if (modal) modal.style.display = 'flex';
+            if (id === 'modal-xray') drawXrayCanvas();
+        }
+
+        function closeModal(id) {
+            const modal = document.getElementById(id);
+            if (modal) modal.style.display = 'none';
+
+            // Al salir del armario o tratamiento, retroceder la cámara automáticamente
+            if (id === 'modal-cabinet' || id === 'modal-treatment') {
+                focusStation('general');
+            }
+        }
+
+        // 1. Salir pulsando la tecla ESC
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                const openModals = document.querySelectorAll('.modal-overlay[style*="display: flex"]');
+                openModals.forEach(m => m.style.display = 'none');
+                focusStation('general');
+            }
+        });
+
+        // 2. Salir al hacer clic en el fondo oscuro exterior de cualquier modal
+        document.querySelectorAll('.modal-overlay').forEach(overlay => {
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) {
+                    closeModal(overlay.id);
+                }
+            });
+        });
+
+        function selectCase(index) {
+            currentCase = CLINICAL_CASES[index];
+            cabinetUnlocked = false;
+            enteredCode = "";
+            document.getElementById('keypad-readout').innerText = "--";
+            document.getElementById('cabinet-feedback').innerText = "";
+
+            document.getElementById('hud-patient-id').innerText = currentCase.boxName;
+            document.getElementById('hud-patient-desc').innerText = currentCase.triageBrief;
+
+            document.getElementById('patient-data-content').innerHTML = currentCase.physical;
+            document.getElementById('monitor-metrics-content').innerHTML = currentCase.ecgMetrics;
+            document.getElementById('lab-data-content').innerHTML = currentCase.lab;
+            document.getElementById('xray-report-content').innerHTML = currentCase.xrayReport;
+
+            const treatContainer = document.getElementById('treatment-options');
+            treatContainer.innerHTML = "";
+            currentCase.treatments.forEach(t => {
+                const label = document.createElement('label');
+                label.style.display = 'block';
+                label.style.padding = '12px';
+                label.style.marginBottom = '10px';
+                label.style.background = '#1e293b';
+                label.style.borderRadius = '6px';
+                label.style.cursor = 'pointer';
+                label.innerHTML = `<input type="radio" name="treatment_choice" value="${t.id}" style="margin-right: 10px;"> ${t.text}`;
+                treatContainer.appendChild(label);
+            });
+
+            resetTimer();
+            closeModal('modal-case-select');
+            focusStation('patient');
+        }
+
+        function pressKey(key) {
+            if (key === 'C') {
+                enteredCode = "";
+            } else if (enteredCode.length < 2) {
+                enteredCode += key;
+            }
+            document.getElementById('keypad-readout').innerText = enteredCode.padEnd(2, '-');
+        }
+
+        function submitCode() {
+            const fb = document.getElementById('cabinet-feedback');
+            if (enteredCode === currentCase.solutionCode) {
+                cabinetUnlocked = true;
+                fb.style.color = "var(--accent-green)";
+                fb.innerText = "¡AUTORIZACIÓN ACEPTADA! Desbloqueando compuerta...";
+
+                setTimeout(() => {
+                    closeModal('modal-cabinet');
+                    openModal('modal-treatment');
+                }, 750);
+            } else {
+                fb.style.color = "var(--accent)";
+                fb.innerText = `Código erróneo. Revisa: ${currentCase.codeHint}`;
+                enteredCode = "";
+                document.getElementById('keypad-readout').innerText = "--";
+            }
+        }
+
+        function confirmTreatment() {
+            const selected = document.querySelector('input[name="treatment_choice"]:checked');
+            if (!selected) {
+                alert("Selecciona un protocolo de rescate antes de confirmar.");
+                return;
+            }
+
+            if (selected.value === 'correct') {
+                closeModal('modal-treatment');
+                document.getElementById('success-explanation').innerHTML = currentCase.resolution;
+                openModal('modal-success');
+                clearInterval(timerInterval);
+            } else {
+                alert("ALERTA CRÍTICA: Protocolo inadecuado. Se ha producido un colapso hemodinámico. Reevalúa las opciones.");
+            }
+        }
+
+        function resetTimer() {
+            clearInterval(timerInterval);
+            timerSeconds = 12 * 60;
+            const timerEl = document.getElementById('timer');
+
+            timerInterval = setInterval(() => {
+                timerSeconds--;
+                const mins = Math.floor(timerSeconds / 60);
+                const secs = timerSeconds % 60;
+                timerEl.innerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+
+                if (timerSeconds <= 0) {
+                    clearInterval(timerInterval);
+                    alert("TIEMPO AGOTADO: El paciente ha entrado en fallo multiorgánico irreversible.");
+                    openModal('modal-case-select');
+                }
+            }, 1000);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        function animate(time) {
+            requestAnimationFrame(animate);
+            TWEEN.update();
+            controls.update();
+
+            ecgOffset += 2;
+            drawMonitorTexture();
+
+            if (patientMesh) {
+                patientMesh.scale.x = 1 + Math.sin(time * 0.003) * 0.03;
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        selectCase(0);
+        animate(0);
+    </script>
+</body>
+</html>
